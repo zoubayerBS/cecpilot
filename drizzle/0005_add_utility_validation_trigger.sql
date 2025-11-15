@@ -1,0 +1,76 @@
+-- CREATE OR REPLACE FUNCTION cecschema.validate_cec_form_utilities()
+-- RETURNS TRIGGER AS $$
+-- DECLARE
+--     v_item text;
+-- BEGIN
+--     -- Check intervention
+--     IF jsonb_typeof(NEW.patient_info->'intervention') = 'string' THEN
+--         v_item := NEW.patient_info->>'intervention';
+--         IF v_item IS NOT NULL AND v_item <> '' AND NOT EXISTS (SELECT 1 FROM cecschema.utilities WHERE category = 'interventions' AND item = v_item) THEN
+--             RAISE EXCEPTION 'Intervention non valide: %', v_item;
+--         END IF;
+--     END IF;
+-- 
+--     -- Check operateur
+--     IF jsonb_typeof(NEW.team_info->'operateur') = 'string' THEN
+--         v_item := NEW.team_info->>'operateur';
+--         IF v_item IS NOT NULL AND v_item <> '' AND NOT EXISTS (SELECT 1 FROM cecschema.utilities WHERE category = 'chirurgiens' AND item = v_item) THEN
+--             RAISE EXCEPTION 'Opérateur non valide: %', v_item;
+--         END IF;
+--     END IF;
+-- 
+--     -- Check anesthesiste
+--     IF jsonb_typeof(NEW.team_info->'anesthesiste') = 'string' THEN
+--         v_item := NEW.team_info->>'anesthesiste';
+--         IF v_item IS NOT NULL AND v_item <> '' AND NOT EXISTS (SELECT 1 FROM cecschema.utilities WHERE category = 'anesthesistes' AND item = v_item) THEN
+--             RAISE EXCEPTION 'Anesthésiste non valide: %', v_item;
+--         END IF;
+--     END IF;
+-- 
+--     -- Check technicien_anesthesie
+--     IF jsonb_typeof(NEW.team_info->'technicien_anesthesie') = 'string' THEN
+--         v_item := NEW.team_info->>'technicien_anesthesie';
+--         IF v_item IS NOT NULL AND v_item <> '' AND NOT EXISTS (SELECT 1 FROM cecschema.utilities WHERE category = 'techniciens-anesthesie' AND item = v_item) THEN
+--             RAISE EXCEPTION 'Technicien d''anesthésie non valide: %', v_item;
+--         END IF;
+--     END IF;
+-- 
+--     -- Check aide_op
+--     IF jsonb_typeof(NEW.team_info->'aide_op') = 'string' THEN
+--         v_item := NEW.team_info->>'aide_op';
+--         IF v_item IS NOT NULL AND v_item <> '' AND NOT EXISTS (SELECT 1 FROM cecschema.utilities WHERE category = 'personnel' AND item = v_item) THEN
+--             RAISE EXCEPTION 'Aide opératoire non valide: %', v_item;
+--         END IF;
+--     END IF;
+-- 
+--     -- Check instrumentiste
+--     IF jsonb_typeof(NEW.team_info->'instrumentiste') = 'string' THEN
+--         v_item := NEW.team_info->>'instrumentiste';
+--         IF v_item IS NOT NULL AND v_item <> '' AND NOT EXISTS (SELECT 1 FROM cecschema.utilities WHERE category = 'personnel' AND item = v_item) THEN
+--             RAISE EXCEPTION 'Instrumentiste non valide: %', v_item;
+--         END IF;
+--     END IF;
+-- 
+--     -- Check perfusionniste
+--     IF jsonb_typeof(NEW.team_info->'perfusionniste') = 'string' THEN
+--         v_item := NEW.team_info->>'perfusionniste';
+--         IF v_item IS NOT NULL AND v_item <> '' AND NOT EXISTS (SELECT 1 FROM cecschema.utilities WHERE category = 'personnel' AND item = v_item) THEN
+--             RAISE EXCEPTION 'Perfusionniste non valide: %', v_item;
+--         END IF;
+--     END IF;
+-- 
+--     -- Check panseur
+--     IF jsonb_typeof(NEW.team_info->'panseur') = 'string' THEN
+--         v_item := NEW.team_info->>'panseur';
+--         IF v_item IS NOT NULL AND v_item <> '' AND NOT EXISTS (SELECT 1 FROM cecschema.utilities WHERE category = 'personnel' AND item = v_item) THEN
+--             RAISE EXCEPTION 'Panseur non valide: %', v_item;
+--         END IF;
+--     END IF;
+-- 
+--     RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql;
+-- 
+-- CREATE TRIGGER validate_cec_form_utilities_trigger
+-- BEFORE INSERT OR UPDATE ON cecschema.cec_forms
+-- FOR EACH ROW EXECUTE FUNCTION cecschema.validate_cec_form_utilities();

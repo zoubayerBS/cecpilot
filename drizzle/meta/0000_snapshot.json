@@ -1,0 +1,223 @@
+{
+  "id": "050f66c8-598a-4394-80bf-2880fff8dabd",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "cecschema.cec_forms": {
+      "name": "cec_forms",
+      "schema": "cecschema",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "patient_info": {
+          "name": "patient_info",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "team_info": {
+          "name": "team_info",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pre_op_bilan": {
+          "name": "pre_op_bilan",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "materiel": {
+          "name": "materiel",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deroulement": {
+          "name": "deroulement",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "blood_gas": {
+          "name": "blood_gas",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "timeline": {
+          "name": "timeline",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cardioplegia": {
+          "name": "cardioplegia",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hemodynamic_monitoring": {
+          "name": "hemodynamic_monitoring",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "blood_products": {
+          "name": "blood_products",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "balance_io": {
+          "name": "balance_io",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "examens_complementaires": {
+          "name": "examens_complementaires",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "observations": {
+          "name": "observations",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "cecschema.sessions": {
+      "name": "sessions",
+      "schema": "cecschema",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires": {
+          "name": "expires",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "sessions_token_unique": {
+          "name": "sessions_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "cecschema.users": {
+      "name": "users",
+      "schema": "cecschema",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "username": {
+          "name": "username",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "users_username_unique": {
+          "name": "users_username_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "username"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {
+    "cecschema": "cecschema"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
