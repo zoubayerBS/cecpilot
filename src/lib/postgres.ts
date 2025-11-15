@@ -1,15 +1,13 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import * as schema from './db/schema';
+import * as dotenv from 'dotenv';
 
-const connectionString = process.env.POSTGRES_URL!;
+dotenv.config({ path: '.env.local' });
 
-const pool = new Pool({
-  connectionString,
-});
+const connectionString = process.env.DATABASE_URL!;
 
-pool.on('connect', (client) => {
-  client.query('SET search_path TO cecschema, public');
-});
+// Disable prefetch as it is not supported for "Transaction" pool mode
+const client = postgres(connectionString, { prepare: false });
 
-export const db = drizzle(pool, { schema });
+export const db = drizzle(client, { schema });

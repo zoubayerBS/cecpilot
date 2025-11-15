@@ -1,14 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.db = void 0;
-var node_postgres_1 = require("drizzle-orm/node-postgres");
-var pg_1 = require("pg");
-var schema = require("./db/schema");
-var connectionString = process.env.POSTGRES_URL;
-var pool = new pg_1.Pool({
-    connectionString: connectionString,
+const libsql_1 = require("drizzle-orm/libsql");
+const client_1 = require("@libsql/client");
+const schema = require("./db/schema");
+const client = (0, client_1.createClient)({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
 });
-pool.on('connect', function (client) {
-    client.query('SET search_path TO cecschema, public');
-});
-exports.db = (0, node_postgres_1.drizzle)(pool, { schema: schema });
+exports.db = (0, libsql_1.drizzle)(client, { schema: schema });

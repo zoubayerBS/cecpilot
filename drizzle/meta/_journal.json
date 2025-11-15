@@ -15,6 +15,13 @@
       "when": 1759051847467,
       "tag": "0001_open_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1759051847468,
+      "tag": "0006_enable_pgcrypto",
+      "breakpoints": true
     }
   ]
 }

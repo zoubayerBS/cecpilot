@@ -331,7 +331,8 @@ export async function verifyUserPassword(username: string, password: string): Pr
     return null;
   } catch (error) {
     console.error('Error verifying user password:', error);
-    throw new Error('Failed to verify user password.');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to verify user password: ${errorMessage}`);
   }
 }
 
