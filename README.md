@@ -1,4 +1,4 @@
-# Firebase Studio
+# CEC Pilot
 
 This is a NextJS starter in Firebase Studio.
 
