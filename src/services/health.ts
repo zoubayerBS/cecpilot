@@ -1,7 +1,7 @@
 
 'use server';
 
-import { getDb } from '@/lib/db';
+import { getDb } from '@/lib/postgres';
 import { sql } from 'drizzle-orm';
 
 export async function checkDbConnection() {

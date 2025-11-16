@@ -1,6 +1,6 @@
 'use server';
 
-import { getDb } from '@/lib/db';
+import { getDb } from '@/lib/postgres';
 import { cecForms, sessions, users } from '@/lib/db/schema';
 import type { CecFormValues } from '@/components/cec-form/schema';
 import { eq, desc, sql } from 'drizzle-orm';
