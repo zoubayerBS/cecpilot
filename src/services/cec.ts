@@ -1,6 +1,6 @@
 'use server';
 
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { cecForms, sessions, users } from '@/lib/db/schema';
 import type { CecFormValues } from '@/components/cec-form/schema';
 import { eq, desc, sql } from 'drizzle-orm';
@@ -106,13 +106,15 @@ export async function saveCecForm(
 
     if (id) {
       // Update existing document
-      const updatedForms = await db.update(cecForms)
+      const db = getDb();
+    const updatedForms = await db.update(cecForms)
         .set({ ...structuredData })
         .where(eq(cecForms.id, Number(id)))
         .returning({ updatedId: cecForms.id });
       return updatedForms[0].updatedId.toString();
     } else {
       // Create new document
+      const db = getDb();
       const newForms = await db.insert(cecForms)
         .values(structuredData)
         .returning({ insertedId: cecForms.id });
@@ -128,6 +130,7 @@ export async function saveCecForm(
 // Function to get all CEC forms from PostgreSQL
 export async function getCecForms(): Promise<CecReport[]> {
   try {
+    const db = getDb();
     const forms = await db.select().from(cecForms).orderBy(desc(cecForms.createdAt));
     return forms.map(form => {
       const {
@@ -179,6 +182,7 @@ export async function getCecForms(): Promise<CecReport[]> {
 // Function to get a single CEC form by its ID
 export async function getCecFormById(id: string): Promise<CecReport | null> {
   try {
+    const db = getDb();
     const formResult = await db.select().from(cecForms).where(eq(cecForms.id, Number(id)));
 
     if (formResult.length > 0) {
@@ -235,6 +239,7 @@ export async function getCecFormById(id: string): Promise<CecReport | null> {
 // Function to delete a CEC form by its ID
 export async function deleteCecForm(id: string): Promise<void> {
   try {
+    const db = getDb();
     await db.delete(cecForms).where(eq(cecForms.id, Number(id)));
   } catch (error) {
     console.error("Error deleting document: ", error);
@@ -248,6 +253,7 @@ export async function createSession(username: string): Promise<string> {
     const token = Math.random().toString(36).substring(2);
     const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours from now
 
+    const db = getDb();
     await db.insert(sessions).values({
         token,
         username,
@@ -257,6 +263,7 @@ export async function createSession(username: string): Promise<string> {
 }
 
 export async function validateSession(token: string): Promise<{ username: string } | null> {
+    const db = getDb();
     const sessionResult = await db.select().from(sessions).where(eq(sessions.token, token));
 
     if (sessionResult.length === 0) {
@@ -267,6 +274,7 @@ export async function validateSession(token: string): Promise<{ username: string
     const expires = session.expires;
 
     if (expires && expires < new Date()) {
+        const db = getDb();
         await db.delete(sessions).where(eq(sessions.token, token)); // Clean up expired session
         return null;
     }
@@ -275,6 +283,7 @@ export async function validateSession(token: string): Promise<{ username: string
 }
 
 export async function deleteSession(token: string): Promise<void> {
+    const db = getDb();
     await db.delete(sessions).where(eq(sessions.token, token)).catch(error => {
         console.warn("Could not delete session, it might have already been removed:", error);
     });
@@ -308,6 +317,7 @@ export async function getAiFlowResponse(flowName: string, input: any): Promise<a
 // Function to get a user by username
 export async function getUserByUsername(username: string) {
   try {
+    const db = getDb();
     const userResult = await db.select().from(users).where(eq(users.username, username));
     return userResult.length > 0 ? userResult[0] : null;
   } catch (error) {
@@ -318,6 +328,7 @@ export async function getUserByUsername(username: string) {
 
 export async function verifyUserPassword(username: string, password: string): Promise<{ id: number; username: string } | null> {
   try {
+    const db = getDb();
     const result = await db.select({
       id: users.id,
       username: users.username

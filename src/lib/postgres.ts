@@ -13,19 +13,13 @@ function getConnectionString(): string {
   return url;
 }
 
-function createClient() {
-  const connectionString = getConnectionString();
-  // Disable prefetch as it is not supported for "Transaction" pool mode
-  return postgres(connectionString, { prepare: false });
-}
-
-export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
-  get(_target, prop, receiver) {
-    if (!_db) {
-      if (!_client) _client = createClient();
-      _db = drizzle(_client, { schema });
+export function getDb() {
+  if (!_db) {
+    if (!_client) {
+      const connectionString = getConnectionString();
+      _client = postgres(connectionString, { prepare: false });
     }
-    // @ts-expect-error - forwarding properties dynamically
-    return Reflect.get(_db, prop, receiver);
-  },
-});
+    _db = drizzle(_client, { schema });
+  }
+  return _db;
+}

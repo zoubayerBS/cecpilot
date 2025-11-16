@@ -1,10 +1,11 @@
 
 'use server';
 
-import { db } from '@/lib/db';
+import { getDb } from '@/lib/db';
 import { sql } from 'drizzle-orm';
 
 export async function checkDbConnection() {
+  const db = getDb();
   try {
     await db.execute(sql`SELECT 1`);
     return { status: 'ok' };
@@ -16,6 +17,7 @@ export async function checkDbConnection() {
 }
 
 export async function getDbSchema() {
+  const db = getDb();
   try {
     const result = await db.execute(sql`SELECT current_schema()`);
     if (result.rows.length > 0) {

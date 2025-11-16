@@ -1,2 +1,2 @@
 
-export * from './postgres';
+export { getDb } from './postgres';
