@@ -1,6 +1,6 @@
 'use server';
 
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/postgres";
 import { utilities } from "@/lib/db/schema";
 import type { UtilityCategory } from "@/components/cec-form/schema";
 import { eq, and, asc } from "drizzle-orm";
@@ -8,6 +8,7 @@ import { eq, and, asc } from "drizzle-orm";
 // Get a list of items for a specific category
 export async function getUtilityList(category: UtilityCategory): Promise<string[]> {
     try {
+        const db = getDb();
         const results = await db.select({ item: utilities.item })
             .from(utilities)
             .where(eq(utilities.category, category))
@@ -24,6 +25,7 @@ export async function getUtilityList(category: UtilityCategory): Promise<string[
 // Add a new item to a category list
 export async function addUtilityItem(category: UtilityCategory, item: string): Promise<void> {
     try {
+        const db = getDb();
         await db.insert(utilities).values({ category, item });
     } catch (error) {
         console.error(`Error adding item to ${category}:`, error);
@@ -39,6 +41,7 @@ export async function addUtilityItem(category: UtilityCategory, item: string): P
 // Delete an item from a category list
 export async function deleteUtilityItem(category: UtilityCategory, item: string): Promise<void> {
     try {
+        const db = getDb();
         await db.delete(utilities)
             .where(and(eq(utilities.category, category), eq(utilities.item, item)));
     } catch (error) {

@@ -1,2 +1,1 @@
 
-export { getDb } from './postgres';
