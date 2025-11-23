@@ -37,6 +37,8 @@ export function PreOpBilan() {
     { name: "na", label: "Na+", unit: "mEq/L", type: "input" },
     { name: "k", label: "K+", unit: "mEq/L", type: "input" },
     { name: "creat", label: "Créat", unit: "mg/dL", type: "input" },
+
+
     { name: "protides", label: "Protides", unit: "g/L", type: "input" },
   ] as const;
 

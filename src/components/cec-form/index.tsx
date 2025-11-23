@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -7,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { cecFormSchema, type CecFormValues, primingSolutes, type PrimingRow, type CardioplegiaDose } from "./schema";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "../ui/button";
-import { Activity, Users, FileText, Printer, Save, Syringe, TestTube, Loader2 } from "lucide-react";
+import { Activity, Users, FileText, Printer, Save, Syringe, TestTube, Loader2, Share2 } from "lucide-react";
 import {
   Tabs,
   TabsContent,
@@ -24,8 +23,15 @@ import { PreOpBilan } from "./pre-op-bilan";
 import { ExamensComplementaires } from "./examens-complementaires";
 import { saveCecForm } from "@/services/cec";
 import { testData } from './test-data';
-import { generatePdf } from "./pdf-generator";
+import { generatePdf, generatePdfBlob } from "./pdf-generator";
 import { useAuth } from "@/hooks/use-auth";
+import { toDataURL } from 'qrcode';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 
 export function CECForm({ initialData, isReadOnly = false, onFormSave }: { initialData?: CecFormValues; isReadOnly?: boolean; onFormSave?: (id: string) => void }) {
@@ -33,6 +39,10 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave }: { initi
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isPrinting, setIsPrinting] = React.useState(false);
+  const [isSharing, setIsSharing] = React.useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = React.useState('');
+  const [shareableLink, setShareableLink] = React.useState('');
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
   
   const form = useForm<CecFormValues>({
     resolver: zodResolver(cecFormSchema),
@@ -66,6 +76,39 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave }: { initi
         setIsPrinting(false);
     }
   }
+
+  const handleShare = async () => {
+    setIsSharing(true);
+    try {
+      const data = getValues();
+      const pdfBlob = await generatePdfBlob(data);
+      const formData = new FormData();
+      formData.append('file', pdfBlob, `${data.nom_prenom?.replace(/ /g, '_')}_${data.matricule}.pdf`);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('File upload failed');
+      }
+
+      const result = await response.json();
+      const link = result.data.url;
+
+      setShareableLink(link);
+      const qrUrl = await toDataURL(link, { width: 300 });
+      setQrCodeUrl(qrUrl);
+      setIsModalOpen(true);
+
+    } catch (error) {
+      console.error("Error sharing file:", error);
+      toast({ title: 'Erreur de Partage', description: "Une erreur est survenue lors du partage du fichier.", variant: 'destructive' });
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   React.useEffect(() => {
     if (initialData) {
@@ -237,6 +280,10 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave }: { initi
                   {isPrinting ? <Loader2 className="mr-2 animate-spin" /> : <Printer className="mr-2" />}
                   PDF
                </Button>
+               <Button type="button" variant="secondary" onClick={handleShare} disabled={isSharing}>
+                  {isSharing ? <Loader2 className="mr-2 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
+                  Partager
+               </Button>
               
               {!isReadOnly && (
                 <Button type="submit" disabled={isSubmitting}>
@@ -249,6 +296,32 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave }: { initi
                 </Button>
               )}
             </footer>
+             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Partager le Compte Rendu</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col items-center justify-center p-4">
+                  {qrCodeUrl && <img src={qrCodeUrl} alt="QR Code" />}
+                  <p className="mt-4 text-sm text-muted-foreground">Scannez le code QR pour obtenir le lien</p>
+                  {shareableLink && (
+                    <div className="mt-4 w-full">
+                       <input type="text" readOnly value={shareableLink} className="w-full rounded-md border bg-muted px-3 py-2 text-sm" />
+                       <Button 
+                         variant="outline"
+                         className="mt-2 w-full"
+                         onClick={() => {
+                           navigator.clipboard.writeText(shareableLink);
+                           toast({ title: 'Copié', description: 'Le lien a été copié dans le presse-papiers.' });
+                         }}
+                       >
+                         Copier le lien
+                       </Button>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
         </form>
       </FormProvider>
   );

@@ -47,7 +47,7 @@ export default function LoginPage() {
        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
         <Card>
             <CardHeader className="text-center">
-                <HeartPulse className="mx-auto h-12 w-12 text-primary" />
+                <HeartPulse className="mx-auto h-12 w-12 text-primary animate-pulse" />
             <CardTitle className="text-2xl mt-4">CEC Pilot</CardTitle>
             <CardDescription>Veuillez vous connecter pour continuer</CardDescription>
             </CardHeader>
