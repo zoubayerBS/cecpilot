@@ -121,13 +121,45 @@
 }
 
 @media print {
+
   body {
+
     background-color: white !important;
+
   }
+
   .print\:hidden {
+
     display: none !important;
+
   }
+
   .print\:block {
+
     display: block !important;
+
   }
+
+}
+
+
+
+@layer utilities {
+
+    @keyframes wave-pulse {
+
+        0%, 100% { transform: scaleY(1); }
+
+        50% { transform: scaleY(3); }
+
+    }
+
+
+
+    .animate-wave-pulse {
+
+        animation: wave-pulse 0.8s infinite ease-in-out;
+
+    }
+
 }

@@ -17,11 +17,47 @@ import {
 } from "@/components/ui/form";
 import { Stethoscope } from "lucide-react";
 import { type CecFormValues } from "./schema";
-import { Textarea } from "../ui/textarea";
+import { DictationTextarea } from "../ui/dictation-textarea";
+import { SimpleWave } from "../ui/simple-wave";
+import { useDictation } from "@/hooks/use-dictation";
+
+function DictationField({ name, label }: { name: "echo_coeur" | "coro", label: string }) {
+  const { control } = useFormContext<CecFormValues>();
+  
+  return (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => {
+        const { isRecording, toggleRecording, isSupported } = useDictation({
+          onChange: field.onChange,
+          value: field.value ?? '',
+        });
+
+        return (
+          <FormItem>
+            <FormLabel>{label}</FormLabel>
+            <FormControl>
+              <DictationTextarea
+                rows={3}
+                {...field}
+                value={field.value ?? ''}
+                isRecording={isRecording}
+                onToggleRecording={toggleRecording}
+                isSupported={isSupported}
+              />
+            </FormControl>
+            {isRecording && <SimpleWave className="text-primary" />}
+            <FormMessage />
+          </FormItem>
+        );
+      }}
+    />
+  );
+}
+
 
 export function ExamensComplementaires() {
-  const { control } = useFormContext<CecFormValues>();
-
   return (
     <Card>
       <CardHeader>
@@ -31,32 +67,8 @@ export function ExamensComplementaires() {
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-6">
-        <FormField
-            control={control}
-            name="echo_coeur"
-            render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Echo Coeur</FormLabel>
-                    <FormControl>
-                        <Textarea rows={3} {...field} value={field.value ?? ''} />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            )}
-        />
-        <FormField
-            control={control}
-            name="coro"
-            render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Coronographie</FormLabel>
-                    <FormControl>
-                        <Textarea rows={3} {...field} value={field.value ?? ''} />
-                    </FormControl>
-                    <FormMessage />
-                </FormItem>
-            )}
-        />
+        <DictationField name="echo_coeur" label="Echo Coeur" />
+        <DictationField name="coro" label="Coronographie" />
       </CardContent>
     </Card>
   );
