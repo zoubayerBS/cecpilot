@@ -5,7 +5,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { PlusCircle, FileText, Eye, Pencil, Stethoscope, Search, Calendar as CalendarIcon, X, Trash2, Activity, Clock, Users } from 'lucide-react';
 import Link from 'next/link';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getCecForms, deleteCecForm, type CecReport } from '@/services/cec';
 import { format, parseISO, startOfDay, endOfDay, isThisMonth, differenceInMinutes } from 'date-fns';
@@ -235,59 +235,78 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             {filteredReports.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[200px]">Patient</TableHead>
-                    <TableHead>Date de la CEC</TableHead>
-                    <TableHead>Intervention</TableHead>
-                    <TableHead>Opérateur</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredReports.map((report) => (
-                    <TableRow key={report.id} className="hover:bg-muted/50" onClick={() => router.push(`/compte-rendu/${report.id}`)} style={{cursor: 'pointer'}}>
-                      <TableCell className="font-medium">{report.nom_prenom}</TableCell>
-                      <TableCell>
-                        {report.date_cec ? format(new Date(report.date_cec), "PPP", { locale: fr }) : 'N/A'}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground truncate max-w-xs">{report.intervention || 'Non spécifiée'}</TableCell>
-                      <TableCell>{report.operateur || 'Non spécifié'}</TableCell>
-                      <TableCell className="text-right">
-                         <Button asChild variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); router.push(`/compte-rendu/${report.id}`)}}>
-                            <Link href={`/compte-rendu/${report.id}`} title="Voir">
-                                <Eye className="h-4 w-4" />
-                                <span className="sr-only">Voir</span>
-                            </Link>
-                        </Button>
-                        <Button asChild variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); router.push(`/compte-rendu/${report.id}?mode=edit`)}}>
-                            <Link href={`/compte-rendu/${report.id}?mode=edit`} title="Modifier">
-                                <Pencil className="h-4 w-4" />
-                                <span className="sr-only">Modifier</span>
-                            </Link>
-                        </Button>
-                         <Button variant="ghost" size="icon" title="Supprimer" onClick={(e) => {e.stopPropagation(); setReportToDelete(report)}}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                            <span className="sr-only">Supprimer</span>
-                        </Button>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="w-[200px]">Patient</TableHead>
+                      <TableHead>Date de la CEC</TableHead>
+                      <TableHead>Intervention</TableHead>
+                      <TableHead>Opérateur</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredReports.map((report) => (
+                      <TableRow key={report.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => router.push(`/compte-rendu/${report.id}`)}>
+                        <TableCell className="font-medium">{report.nom_prenom}</TableCell>
+                        <TableCell>
+                          {report.date_cec ? format(new Date(report.date_cec), "PPP", { locale: fr }) : 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground truncate max-w-xs">{report.intervention || 'Non spécifiée'}</TableCell>
+                        <TableCell>{report.operateur || 'Non spécifié'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button asChild variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); router.push(`/compte-rendu/${report.id}`)}}>
+                                <Link href={`/compte-rendu/${report.id}`} title="Voir">
+                                    <Eye className="h-4 w-4" />
+                                    <span className="sr-only">Voir</span>
+                                </Link>
+                            </Button>
+                            <Button asChild variant="ghost" size="icon" onClick={(e) => {e.stopPropagation(); router.push(`/compte-rendu/${report.id}?mode=edit`)}}>
+                                <Link href={`/compte-rendu/${report.id}?mode=edit`} title="Modifier">
+                                    <Pencil className="h-4 w-4" />
+                                    <span className="sr-only">Modifier</span>
+                                </Link>
+                            </Button>
+                            <Button variant="ghost" size="icon" title="Supprimer" onClick={(e) => {e.stopPropagation(); setReportToDelete(report)}}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                                <span className="sr-only">Supprimer</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             ) : (
               <div className="text-center text-muted-foreground py-16">
-                <Stethoscope className="mx-auto h-12 w-12 text-gray-400" />
+                <FileText className="mx-auto h-12 w-12 text-gray-400" />
                  <p className="mt-4 text-lg font-medium">
                   {searchTerm || startDate || endDate ? "Aucun compte rendu ne correspond à vos filtres" : "Aucun compte rendu trouvé."}
                 </p>
-                <p className="text-sm mt-2">
-                   {searchTerm || startDate || endDate ? "Essayez de modifier ou d'effacer vos filtres." : 'Cliquez sur "Nouveau Compte Rendu" pour commencer.'}
+                <p className="text-sm mt-2 mb-6">
+                   {searchTerm || startDate || endDate ? "Essayez de modifier ou d'effacer vos filtres." : 'Cliquez sur le bouton ci-dessous pour commencer.'}
                 </p>
+                {!(searchTerm || startDate || endDate) && (
+                    <Button asChild>
+                        <Link href="/nouveau-compte-rendu">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Nouveau Compte Rendu
+                        </Link>
+                    </Button>
+                )}
               </div>
             )}
           </CardContent>
+          {filteredReports.length > 0 && (
+            <CardFooter>
+              <div className="text-xs text-muted-foreground">
+                <strong>{filteredReports.length}</strong> {filteredReports.length > 1 ? "résultats trouvés." : "résultat trouvé."}
+              </div>
+            </CardFooter>
+          )}
         </Card>
       </div>
 
