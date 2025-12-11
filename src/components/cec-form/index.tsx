@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { parse, isValid } from "date-fns";
 import { cecFormSchema, type CecFormValues, primingSolutes, type PrimingRow, type CardioplegiaDose } from "./schema";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "../ui/button";
@@ -138,20 +139,27 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave }: { initi
 
   React.useEffect(() => {
     if (dateNaissance) {
-      try {
-        const birthDate = new Date(dateNaissance);
+      // Handles both 'yyyy-MM-dd' and 'dd/MM/yyyy'
+      let birthDate = parse(dateNaissance, 'yyyy-MM-dd', new Date());
+      if (!isValid(birthDate)) {
+        birthDate = parse(dateNaissance, 'dd/MM/yyyy', new Date());
+      }
+
+      if (isValid(birthDate)) {
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
         const m = today.getMonth() - birthDate.getMonth();
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
+          age--;
         }
-        setValue("age", age >= 0 ? age : undefined, { shouldValidate: true });
-      } catch (e) {
+        setValue("age", age >= 0 ? age : undefined, {
+          shouldValidate: true,
+        });
+      } else {
         setValue("age", undefined);
       }
     } else {
-        setValue("age", undefined);
+      setValue("age", undefined);
     }
   }, [dateNaissance, setValue]);
 

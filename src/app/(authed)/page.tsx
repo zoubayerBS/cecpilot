@@ -39,6 +39,8 @@ export default function Home() {
   const [reportToDelete, setReportToDelete] = useState<CecReport | null>(null);
   const router = useRouter();
   const { toast } = useToast();
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     async function fetchReports() {
@@ -119,6 +121,16 @@ export default function Home() {
       return searchMatch && dateMatch;
     });
   }, [reports, searchTerm, startDate, endDate]);
+
+  const paginatedReports = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredReports.slice(startIndex, endIndex);
+  }, [filteredReports, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, startDate, endDate]);
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -234,22 +246,24 @@ export default function Home() {
             <CardTitle>Comptes Rendus Récents</CardTitle>
           </CardHeader>
           <CardContent>
-            {filteredReports.length > 0 ? (
+            {paginatedReports.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
                       <TableHead className="w-[200px]">Patient</TableHead>
+                      {/* <TableHead>Numéro CEC</TableHead> */}
                       <TableHead>Date de la CEC</TableHead>
                       <TableHead>Intervention</TableHead>
                       <TableHead>Opérateur</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredReports.map((report) => (
+                    {paginatedReports.map((report) => (
                       <TableRow key={report.id} className="hover:bg-muted/40 cursor-pointer" onClick={() => router.push(`/compte-rendu/${report.id}`)}>
                         <TableCell className="font-medium">{report.nom_prenom}</TableCell>
+                        {/* <TableCell>{report.numero_cec || 'N/A'}</TableCell> */}
                         <TableCell>
                           {report.date_cec ? format(new Date(report.date_cec), "PPP", { locale: fr }) : 'N/A'}
                         </TableCell>
@@ -302,8 +316,31 @@ export default function Home() {
           </CardContent>
           {filteredReports.length > 0 && (
             <CardFooter>
-              <div className="text-xs text-muted-foreground">
-                <strong>{filteredReports.length}</strong> {filteredReports.length > 1 ? "résultats trouvés." : "résultat trouvé."}
+              <div className="flex justify-between items-center w-full">
+                <div className="text-xs text-muted-foreground">
+                    <strong>{filteredReports.length}</strong> {filteredReports.length > 1 ? "résultats trouvés." : "résultat trouvé."}
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                    >
+                        Précédent
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Page {currentPage} sur {Math.ceil(filteredReports.length / itemsPerPage)}
+                    </span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => prev + 1)}
+                        disabled={currentPage * itemsPerPage >= filteredReports.length}
+                    >
+                        Suivant
+                    </Button>
+                </div>
               </div>
             </CardFooter>
           )}
