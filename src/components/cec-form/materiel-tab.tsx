@@ -33,6 +33,11 @@ const equipmentFields: Array<{ name: UtilityCategory; label: string }> = [
 ];
 
 
+import { useQuery } from '@tanstack/react-query';
+import { getUtilities } from '@/services/utilities';
+import { Skeleton } from '@/components/ui/skeleton';
+
+
 export function MaterielTab({ isReadOnly }: MaterielTabProps) {
     const { control, setValue } = useFormContext<CecFormValues>();
 
@@ -42,6 +47,14 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
     const { fields: primingFields } = useFieldArray({
       control,
       name: "priming",
+    });
+
+    const equipmentCategories = React.useMemo(() => equipmentFields.map(f => f.name), []);
+    const { data: equipmentOptions, isLoading: isLoadingEquipment } = useQuery({
+        queryKey: ['utilities', equipmentCategories],
+        queryFn: () => getUtilities(equipmentCategories),
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        enabled: equipmentCategories.length > 0 && !isReadOnly,
     });
 
     const watchHeparineCircuit = useWatch({ control, name: 'heparine_circuit' });
@@ -82,45 +95,39 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
                             <Package size={20} />Équipement et Canules
                         </CardTitle>
                     </CardHeader>
-                   {/*  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-6">
-                        {equipmentFields.map((item) => (
-                            <FormField
-                                key={item.name}
-                                name={item.name}
-                                control={control}
-                                render={({ field }) => (
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-6">
+                        {isLoadingEquipment ? (
+                            equipmentFields.map(item => (
+                                <div key={item.name} className="space-y-2">
+                                    <FormLabel>{item.label}</FormLabel>
+                                    <Skeleton className="h-10 w-full" />
+                                </div>
+                            ))
+                        ) : (
+                            equipmentFields.map((item) => (
+                                <FormField
+                                    key={item.name}
+                                    name={item.name}
+                                    control={control}
+                                    render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>{item.label}</FormLabel>
-                                        <FormControl><Input {...field} value={field.value ?? ''} autoComplete="off" /></FormControl>
+                                        <FormControl>
+                                            <Combobox
+                                                category={item.name}
+                                                value={field.value ?? ""}
+                                                onChange={field.onChange}
+                                                options={equipmentOptions?.[item.name] ?? []}
+                                                disabled={isReadOnly || isLoadingEquipment}
+                                            />
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
-                                )}
-                            />
-                        ))}
-                    </CardContent> */}
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-6">
-  {equipmentFields.map((item) => (
-    <FormField
-      key={item.name}
-      name={item.name}
-      control={control}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{item.label}</FormLabel>
-          <FormControl>
-            <Combobox
-              category={item.name}
-              value={field.value ?? ""}
-              onChange={field.onChange}
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  ))}
-</CardContent>
-
+                                    )}
+                                />
+                            ))
+                        )}
+                    </CardContent>
                 </Card>
 
                 <Card>

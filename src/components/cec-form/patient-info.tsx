@@ -22,11 +22,21 @@ import { fr } from "date-fns/locale";
 import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { Combobox } from "../ui/combobox";
 
+import { useQuery } from "@tanstack/react-query";
+import { getUtilities } from "@/services/utilities";
+import { Skeleton } from "../ui/skeleton";
+
 export function PatientInfo() {
   const { control, watch } = useFormContext<CecFormValues>();
   const surfaceCorporelle = watch("surface_corporelle");
   const debitTheorique = watch("debit_theorique");
   const age = watch("age");
+
+  const { data: interventionOptions, isLoading: isLoadingInterventions } = useQuery({
+      queryKey: ['utilities', ['interventions']],
+      queryFn: () => getUtilities(['interventions']),
+      staleTime: 5 * 60 * 1000,
+  });
 
   return (
     <Card>
@@ -374,11 +384,17 @@ export function PatientInfo() {
           render={({ field }) => (
             <FormItem className="md:col-span-2 flex flex-col">
               <FormLabel>Intervention</FormLabel>
-              <Combobox
-                category={"interventions"}
-                value={field.value ?? ""}
-                onChange={field.onChange}
-              />
+              {isLoadingInterventions ? (
+                  <Skeleton className="h-10 w-full" />
+              ) : (
+                <Combobox
+                  category={"interventions"}
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  options={interventionOptions?.['interventions'] ?? []}
+                  disabled={isLoadingInterventions}
+                />
+              )}
               <FormMessage />
             </FormItem>
           )}

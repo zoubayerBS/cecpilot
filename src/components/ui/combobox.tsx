@@ -18,30 +18,25 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { getUtilityList, addUtilityItem } from "@/services/utilities"
+import { addUtilityItem } from "@/services/utilities"
 import { type UtilityCategory } from "../cec-form/schema"
 import { useToast } from "@/hooks/use-toast"
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 
 
 interface ComboboxProps {
     category: UtilityCategory;
     value: string;
     onChange: (value: string) => void;
+    options: string[];
     disabled?: boolean;
 }
 
-export function Combobox({ category, value, onChange, disabled }: ComboboxProps) {
+export function Combobox({ category, value, onChange, options, disabled }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState('');
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const { data: options = [], isLoading } = useQuery<string[]>({
-    queryKey: ['utilities', category],
-    queryFn: () => getUtilityList(category),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
 
   const formattedOptions = React.useMemo(() => 
     options.map(item => ({ value: item.toLowerCase(), label: item }))
@@ -57,7 +52,8 @@ export function Combobox({ category, value, onChange, disabled }: ComboboxProps)
     if (search && !formattedOptions.some(o => o.label.toLowerCase() === search.toLowerCase())) {
        try {
         await addUtilityItem(category, search);
-        await queryClient.invalidateQueries({ queryKey: ['utilities', category] });
+        // Invalidate the parent query
+        await queryClient.invalidateQueries({ queryKey: ['utilities'] });
         onChange(search);
         toast({ title: 'Succès', description: `"${search}" a été ajouté.` });
         setSearch('');
@@ -84,7 +80,7 @@ export function Combobox({ category, value, onChange, disabled }: ComboboxProps)
           role="combobox"
           aria-expanded={open}
           className="w-full justify-between"
-          disabled={disabled || isLoading}
+          disabled={disabled}
         >
           <span className="truncate">{displayValue}</span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

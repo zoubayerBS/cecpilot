@@ -3,7 +3,7 @@
 import { getDb } from "@/lib/postgres";
 import { utilities } from "@/lib/db/schema";
 import type { UtilityCategory } from "@/components/cec-form/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, inArray } from "drizzle-orm";
 
 // Get a list of items for a specific category
 export async function getUtilityList(category: UtilityCategory): Promise<string[]> {
@@ -21,6 +21,43 @@ export async function getUtilityList(category: UtilityCategory): Promise<string[
         throw new Error(`Failed to get utility list for ${category}: ${errorMessage}`);
     }
 }
+
+// New function to get multiple utility lists at once
+export async function getUtilities(categories: UtilityCategory[]): Promise<Record<UtilityCategory, string[]>> {
+    try {
+        if (categories.length === 0) {
+            return {} as Record<UtilityCategory, string[]>;
+        }
+        
+        const db = getDb();
+        const results = await db.select({
+            category: utilities.category,
+            item: utilities.item
+        })
+        .from(utilities)
+        .where(inArray(utilities.category, categories))
+        .orderBy(asc(utilities.category), asc(utilities.item));
+
+        // Initialize the record with empty arrays for each requested category
+        const grouped = categories.reduce((acc, cat) => {
+            acc[cat] = [];
+            return acc;
+        }, {} as Record<UtilityCategory, string[]>);
+
+        // Populate the arrays with items from the database results
+        for (const row of results) {
+            // The `inArray` filter ensures that row.category is a key in our `grouped` object
+            grouped[row.category as UtilityCategory].push(row.item);
+        }
+
+        return grouped;
+    } catch (error) {
+        console.error(`Error getting utility lists for categories:`, error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to get utility lists: ${errorMessage}`);
+    }
+}
+
 
 // Add a new item to a category list
 export async function addUtilityItem(category: UtilityCategory, item: string): Promise<void> {
