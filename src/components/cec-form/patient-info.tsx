@@ -166,7 +166,7 @@ export function PatientInfo() {
                         )
                       }
                       disabled={(date) =>
-                        date > new Date() || date < new Date("1920-01-01")
+                        date > new Date() || date < new Date("1900-01-01")
                       }
                       initialFocus
                     />

@@ -17,7 +17,20 @@ export const primingSolutes = [
     'Autre'
 ];
 
-export type UtilityCategory = 'interventions' | 'chirurgiens' | 'anesthesistes' | 'personnel' | 'techniciens-anesthesie' | 'drogues';
+export type UtilityCategory = 
+    'interventions' | 
+    'chirurgiens' | 
+    'anesthesistes' | 
+    'personnel' | 
+    'techniciens-anesthesie' | 
+    'drogues' |
+    'oxygenateur' |
+    'circuit' |
+    'canule_art' |
+    'canule_vein' |
+    'canule_cardio' |
+    'canule_decharge' |
+    'kit_hemo';
 
 
 const primingRowSchema = z.object({

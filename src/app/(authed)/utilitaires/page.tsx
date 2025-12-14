@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -17,6 +16,13 @@ const utilityCategories: { id: UtilityCategory, name: string, description: strin
     { id: 'anesthesistes', name: 'Anesthésistes', description: "Gérez la liste des médecins anesthésistes." },
     { id: 'techniciens-anesthesie', name: "T.Anesthésiste", description: "Gérez la liste des techniciens d'anesthésie." },
     { id: 'personnel', name: 'Autre Personnel', description: "Gérez les aides, instrumentistes, perfusionnistes, etc." },
+    { id: 'oxygenateur', name: 'Oxygénateurs', description: "Gérez la liste des oxygénateurs." },
+    { id: 'circuit', name: 'Circuits', description: "Gérez la liste des circuits." },
+    { id: 'canule_art', name: 'Canules Artérielles', description: "Gérez la liste des canules artérielles." },
+    { id: 'canule_vein', name: 'Canules Veineuses', description: "Gérez la liste des canules veineuses." },
+    { id: 'canule_cardio', name: 'Canules Cardioplégie', description: "Gérez la liste des canules de cardioplégie." },
+    { id: 'canule_decharge', name: 'Canules Décharge', description: "Gérez la liste des canules de décharge." },
+    { id: 'kit_hemo', name: 'Kits Hémofiltration', description: "Gérez la liste des kits d'hémofiltration." },
 ];
 
 function UtilityManager({ category, name, description }: { category: UtilityCategory, name: string, description: string }) {

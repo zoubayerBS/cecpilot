@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
-import type { CecFormValues } from './schema';
+import type { CecFormValues, UtilityCategory } from './schema';
 import { Syringe, Droplets, Package, PlusCircle, Trash2 } from 'lucide-react';
+import { Combobox } from "../ui/combobox";
 
 interface MaterielTabProps {
     isReadOnly: boolean;
@@ -21,7 +22,7 @@ interface PrimingTotals {
     total: number;
 }
 
-const equipmentFields: { name: keyof CecFormValues, label: string }[] = [
+const equipmentFields: Array<{ name: UtilityCategory; label: string }> = [
     { name: 'oxygenateur', label: 'Oxygénateur' },
     { name: 'circuit', label: 'Circuit' },
     { name: 'canule_art', label: 'Canule Artérielle' },
@@ -81,7 +82,7 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
                             <Package size={20} />Équipement et Canules
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-6">
+                   {/*  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-6">
                         {equipmentFields.map((item) => (
                             <FormField
                                 key={item.name}
@@ -96,7 +97,30 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
                                 )}
                             />
                         ))}
-                    </CardContent>
+                    </CardContent> */}
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 pt-6">
+  {equipmentFields.map((item) => (
+    <FormField
+      key={item.name}
+      name={item.name}
+      control={control}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{item.label}</FormLabel>
+          <FormControl>
+            <Combobox
+              category={item.name}
+              value={field.value ?? ""}
+              onChange={field.onChange}
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  ))}
+</CardContent>
+
                 </Card>
 
                 <Card>
@@ -123,7 +147,7 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
                                                     autoComplete="off"
                                                     className="pr-8"
                                                 />
-                                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">UI</span>
+                                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">Mg</span>
                                             </div>
                                         </FormControl>
                                         <FormMessage />
@@ -146,7 +170,7 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
                                                     autoComplete="off"
                                                     className="pr-8"
                                                 />
-                                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">UI</span>
+                                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">Mg</span>
                                             </div>
                                         </FormControl>
                                         <FormMessage />
@@ -169,7 +193,7 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
                                                     autoComplete="off"
                                                     className="pr-8 bg-muted"
                                                 />
-                                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">UI</span>
+                                                <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">Mg</span>
                                             </div>
                                         </FormControl>
                                         <FormMessage />
