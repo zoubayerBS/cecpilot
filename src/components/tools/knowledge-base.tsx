@@ -96,7 +96,7 @@ export function KnowledgeBase() {
                                 <CardTitle className="text-xl font-bold tracking-tight">Assistant IA Clinique</CardTitle>
                                 <CardDescription className="flex items-center gap-1.5 mt-0.5">
                                     <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                                    Intelligence Médicale Globale (Directives Internationales)
+                                    Llama-3.1 8B Expert • Standards EACTS/SCTS/AHA
                                 </CardDescription>
                             </div>
                         </div>

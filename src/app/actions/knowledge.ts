@@ -3,8 +3,9 @@
 
 export async function askKnowledgeBase(prompt: string) {
     const apiKey = process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || process.env.NEXT_PUBLIC_HF_TOKEN;
+    const modelId = process.env.HF_MODEL_ID || "meta-llama/Llama-3.1-8B-Instruct";
 
-    console.log('--- AI Knowledge Base (HF Router API) ---');
+    console.log(`--- AI Knowledge Base (Model: ${modelId}) ---`);
 
     if (!apiKey) {
         return { success: false, error: "Clé API Hugging Face manquante (HUGGINGFACE_API_KEY)." };
@@ -20,7 +21,7 @@ export async function askKnowledgeBase(prompt: string) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                model: "meta-llama/Llama-3.1-8B-Instruct",
+                model: modelId,
                 messages: [
                     {
                         role: "system",

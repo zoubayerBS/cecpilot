@@ -80,11 +80,11 @@ export function ClinicalAssistantFloating() {
                                 <Sparkles className="h-4 w-4 text-primary animate-pulse" />
                             </div>
                             <div>
-                                <CardTitle className="text-sm font-bold">Assistant IA Clinique</CardTitle>
-                                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                    Expertise Globale Active
-                                </p>
+                                <CardTitle className="text-sm font-bold">CEC Pilot Assistant IA Clinique</CardTitle>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]" />
+                                    <span className="text-[10px] text-muted-foreground font-medium">Llama-3.1 8B Expert</span>
+                                </div>
                             </div>
                         </div>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setIsOpen(false)}>
