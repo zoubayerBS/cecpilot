@@ -8,7 +8,7 @@ import { z } from 'zod';
 import {
     BrainCircuit,
     Calculator,
-    Droplets,
+    Droplets, Sparkles,
     Wind,
     Activity,
     ShieldAlert,
@@ -23,7 +23,8 @@ import {
     FlaskConical,
     Loader2,
     TestTube,
-    Lightbulb
+    Lightbulb,
+    Book
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,13 +32,21 @@ import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { predictHematology } from '@/ai/flows/predict-hematology';
-import { optimizePerfusion } from '@/ai/flows/optimize-perfusion';
-import { predictComplications } from '@/ai/flows/predict-complications';
-import { analyzeAcidBase } from '@/ai/flows/analyze-acid-base';
-import { generateCecPlan } from '@/ai/flows/generate-cec-plan';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { aiPredictionService, HematologyInput, PerfusionInput, ComplicationInput } from '@/services/ai-prediction';
+// import { generateCecPlan } from '@/ai/flows/generate-cec-plan'; // Temporarily removed
+// import { analyzeAcidBase } from '@/ai/flows/analyze-acid-base'; // Temporarily removed
 
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import dynamic from 'next/dynamic';
+
+const KnowledgeBase = dynamic(() => import('@/components/tools/knowledge-base').then(mod => mod.KnowledgeBase), {
+    ssr: false,
+    loading: () => (
+        <Card className="min-h-[400px] flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </Card>
+    )
+});
 
 const calculatorSchema = z.object({
     poids: z.coerce.number().positive("Le poids est requis.").optional(),
@@ -57,139 +66,6 @@ const calculatorSchema = z.object({
 
 type CalculatorValues = z.infer<typeof calculatorSchema>;
 
-// Types duplicated from predict-hematology.ts to avoid "use server" export issues
-const HematologyPredictionInputSchema = z.object({
-  weightKg: z.number().describe('Poids du patient en kilogrammes.'),
-  heightCm: z.number().describe('Taille du patient en centimètres.'),
-  sex: z.enum(['homme', 'femme']).describe('Sexe du patient.'),
-  initialHematocrit: z.number().describe('Niveau d\'hématocrite initial en %.'),
-  initialHemoglobin: z.number().describe('Niveau d\'hémoglobine initial en g/dL.'),
-  primingVolumeMl: z.number().describe('Volume du liquide d\'amorçage en millilitres.'),
-});
-type HematologyPredictionInput = z.infer<typeof HematologyPredictionInputSchema>;
-
-const HematologyPredictionOutputSchema = z.object({
-  transfusionRisk: z.object({
-    isRisk: z.boolean().describe('Indique s\'il existe un risque significatif de nécessiter une transfusion sanguine.'),
-    assessment: z.string().describe('Une brève évaluation du risque transfusionnel, expliquant le raisonnement.'),
-  }),
-  transfusionRecommendation: z.object({
-    recommendation: z.string().describe('Recommandation de transfusion, par exemple, "Aucune transfusion requise", "Préparer 1 culot globulaire", etc.'),
-    justification: z.string().describe('Justification de la recommandation de transfusion basée sur les niveaux prédits d\'hématocrite/hémoglobine.'),
-  }),
-  anemiaDetection: z.object({
-    isAnemia: z.boolean().describe('Indique si le patient est susceptible d\'avoir ou de développer une anémie sévère pendant la procédure.'),
-    assessment: z.string().describe('Évaluation du statut de l\'anémie et de son impact potentiel sur la procédure.'),
-  }),
-});
-type HematologyPredictionOutput = z.infer<typeof HematologyPredictionOutputSchema>;
-
-
-// Types duplicated from optimize-perfusion.ts to avoid "use server" export issues
-const OptimizePerfusionInputSchema = z.object({
-  poids: z.number().describe('Poids du patient en kilogrammes.'),
-  debitCec: z.number().describe('Débit de la CEC en L/min.'),
-  hb: z.number().describe('Niveau d\'hémoglobine actuel en g/dL.'),
-  surfaceCorporelle: z.number().describe('Surface corporelle du patient en m².'),
-});
-type OptimizePerfusionInput = z.infer<typeof OptimizePerfusionInputSchema>;
-
-const OptimizePerfusionOutputSchema = z.object({
-  do2: z.number().describe('Délivrance en oxygène calculée en ml/min/m².'),
-  isAdequate: z.boolean().describe('Indique si la DO2 est adéquate (généralement > 280 ml/min/m²).'),
-  assessment: z.string().describe('Une brève évaluation de l\'état de la perfusion.'),
-  recommendation: z.string().describe('Recommandation pour optimiser la perfusion si nécessaire.'),
-});
-type OptimizePerfusionOutput = z.infer<typeof OptimizePerfusionOutputSchema>;
-
-// Types duplicated from predict-complications.ts
-const ComplicationsPredictionInputSchema = z.object({
-    age: z.number().describe('Âge du patient en années.'),
-    poids: z.number().describe('Poids du patient en kilogrammes.'),
-    hb: z.number().describe('Niveau d\'hémoglobine en g/dL.'),
-    dureeCecMinutes: z.number().describe('Durée anticipée de la CEC en minutes.'),
-    hemodilution: z.number().describe('Hématocrite estimé après priming en %.'),
-});
-type ComplicationsPredictionInput = z.infer<typeof ComplicationsPredictionInputSchema>;
-
-const ComplicationsPredictionOutputSchema = z.object({
-    hypotension: z.object({
-        risk: z.enum(['Faible', 'Modéré', 'Élevé']),
-        assessment: z.string(),
-    }),
-    sirs: z.object({
-        risk: z.enum(['Faible', 'Modéré', 'Élevé']),
-        assessment: z.string(),
-    }),
-    coagulopathie: z.object({
-        risk: z.enum(['Faible', 'Modéré', 'Élevé']),
-        assessment: z.string(),
-    }),
-});
-type ComplicationsPredictionOutput = z.infer<typeof ComplicationsPredictionOutputSchema>;
-
-
-// Types duplicated from analyze-acid-base.ts
-const AcidBaseAnalysisInputSchema = z.object({
-    poids: z.number().describe('Poids du patient en kilogrammes.'),
-    ph: z.number().describe('La valeur du pH sanguin.'),
-    paco2: z.number().describe('La pression partielle de dioxyde de carbone (PaCO2) en mmHg.'),
-    hco3: z.number().describe('La concentration en bicarbonate (HCO3-) en mmol/L.'),
-    k: z.number().describe('La concentration en potassium (K+) en mEq/L.'),
-    hematocrite: z.number().describe('Le niveau d\'hématocrite en %.'),
-});
-type AcidBaseAnalysisInput = z.infer<typeof AcidBaseAnalysisInputSchema>;
-
-const AcidBaseAnalysisOutputSchema = z.object({
-    acidBaseStatus: z.object({
-        status: z.string().describe("Le trouble acido-basique principal identifié (ex: 'Acidose métabolique compensée', 'Équilibre normal')."),
-        assessment: z.string().describe("Une évaluation détaillée du trouble, expliquant les valeurs clés."),
-    }),
-    electrolyteStatus: z.object({
-        status: z.string().describe("Le statut électrolytique principal identifié (ex: 'Hyperkaliémie modérée', 'Kaliémie normale')."),
-        assessment: z.string().describe("Une évaluation du statut du potassium et d'autres électrolytes pertinents."),
-    }),
-    recommendations: z.array(z.string()).describe("Une liste de recommandations concrètes pour corriger les troubles identifiés."),
-});
-type AcidBaseAnalysisOutput = z.infer<typeof AcidBaseAnalysisOutputSchema>;
-
-// Types duplicated from generate-cec-plan.ts
-const CecPlanInputSchema = z.object({
-    poids: z.number().optional(),
-    taille: z.number().optional(),
-    sexe: z.enum(['homme', 'femme']),
-    age: z.number().optional(),
-    hematocriteInitial: z.number().optional(),
-    hbInitial: z.number().optional(),
-    volumePriming: z.number().optional(),
-    dureeCec: z.number().optional(),
-    ph: z.number().optional(),
-    paco2: z.number().optional(),
-    hco3: z.number().optional(),
-    k: z.number().optional(),
-    bsa: z.number().optional(),
-    debitTheorique: z.number().optional(),
-    hematocritePostPriming: z.number().optional(),
-});
-type CecPlanInput = z.infer<typeof CecPlanInputSchema>;
-
-const CecPlanOutputSchema = z.object({
-  plan: z.array(
-    z.object({
-      title: z.string().describe('Titre de la section du plan (ex: "Plan de Perfusion", "Gestion des Risques").'),
-      content: z.array(z.string()).describe('Liste des points ou recommandations pour cette section.'),
-    })
-  ).describe('Un plan de CEC personnalisé et détaillé.'),
-  alerts: z.array(
-      z.object({
-          riskLevel: z.enum(['Élevé', 'Modéré', 'Faible']).describe("Niveau de risque de l'alerte."),
-          description: z.string().describe("Description de l'alerte prédictive."),
-      })
-  ).describe('Liste des alertes prédictives les plus importantes.'),
-});
-type CecPlanOutput = z.infer<typeof CecPlanOutputSchema>;
-
-
 const ResultField = ({ label, value, unit }: { label: string; value: string; unit: string }) => (
     <div className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
         <span className="text-sm font-medium text-muted-foreground">{label}</span>
@@ -199,7 +75,7 @@ const ResultField = ({ label, value, unit }: { label: string; value: string; uni
 
 const HematologyPrediction = () => {
     const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState<HematologyPredictionOutput | null>(null);
+    const [result, setResult] = React.useState<any>(null); // Use any or define adapter type
     const [error, setError] = React.useState<string | null>(null);
     const form = useFormContext<CalculatorValues>();
 
@@ -212,21 +88,21 @@ const HematologyPrediction = () => {
         const { poids, taille, sexe, hematocriteInitial, volumePriming, hbInitial } = formValues;
 
         if (!poids || !taille || !sexe || !hematocriteInitial || !volumePriming || !hbInitial) {
-             setError("Veuillez remplir toutes les données patient et priming pour lancer la prédiction.");
-             setLoading(false);
-             return;
+            setError("Veuillez remplir toutes les données patient et priming pour lancer la prédiction.");
+            setLoading(false);
+            return;
         }
 
         try {
-            const input: HematologyPredictionInput = {
-                weightKg: Number(poids),
-                heightCm: Number(taille),
-                sex: sexe,
-                initialHematocrit: Number(hematocriteInitial),
-                primingVolumeMl: Number(volumePriming),
-                initialHemoglobin: Number(hbInitial)
+            const input: HematologyInput & { poids?: number, taille?: number, age?: number } = {
+                hemoglobine: Number(hbInitial),
+                hematocrite: Number(hematocriteInitial),
+                plaquettes: 150000,
+                poids: Number(poids),
+                taille: Number(taille),
+                age: 60, // Default or add field to form if exist
             };
-            const prediction = await predictHematology(input);
+            const prediction = await aiPredictionService.predictHematologyRisks(input);
             setResult(prediction);
         } catch (e) {
             console.error(e);
@@ -241,34 +117,25 @@ const HematologyPrediction = () => {
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-primary">
                     <Droplets />
-                    Prédiction Hématologique & Transfusion
+                    Prédiction Hématologique & Transfusion (TF.js)
                 </CardTitle>
                 <CardDescription>
-                   Évaluation du risque transfusionnel, recommandation de culots globulaires et détection d'anémie.
+                    Évaluation du risque basée sur des modèles prédictifs locaux.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 {result && (
                     <div className="space-y-4">
-                        <Alert variant={result.transfusionRisk.isRisk ? 'destructive' : 'default'}>
+                        <Alert variant={result.riskLevel === 'Élevé' ? 'destructive' : 'default'}>
                             <ShieldAlert className="h-4 w-4" />
-                            <AlertTitle>Risque Transfusionnel</AlertTitle>
+                            <AlertTitle>Risque: {result.riskLevel}</AlertTitle>
                             <AlertDescription>
-                                {result.transfusionRisk.assessment}
+                                {result.message} (Confiance: {result.confidence * 100}%)
                             </AlertDescription>
                         </Alert>
-                         <div className="space-y-2">
-                             <ResultField label="Anémie Sévère" value={result.anemiaDetection.isAnemia ? 'Oui' : 'Non'} unit="" />
-                             <p className="text-xs text-muted-foreground">{result.anemiaDetection.assessment}</p>
-                         </div>
-                         <Separator />
-                          <div className="space-y-2">
-                            <ResultField label="Recommandation Transfusion" value={result.transfusionRecommendation.recommendation} unit="" />
-                             <p className="text-xs text-muted-foreground">{result.transfusionRecommendation.justification}</p>
-                          </div>
                     </div>
                 )}
-                 {error && (
+                {error && (
                     <Alert variant="destructive">
                         <AlertTitle>Erreur</AlertTitle>
                         <AlertDescription>{error}</AlertDescription>
@@ -276,9 +143,9 @@ const HematologyPrediction = () => {
                 )}
             </CardContent>
             <CardFooter>
-                 <Button onClick={handlePrediction} disabled={loading}>
+                <Button onClick={handlePrediction} disabled={loading}>
                     {loading ? <Loader2 className="mr-2 animate-spin" /> : <Bot className="mr-2" />}
-                    Lancer l'analyse IA
+                    Lancer l'analyse TF.js
                 </Button>
             </CardFooter>
         </Card>
@@ -287,7 +154,7 @@ const HematologyPrediction = () => {
 
 const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debitTheoriqueLmin?: string }) => {
     const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState<OptimizePerfusionOutput | null>(null);
+    const [result, setResult] = React.useState<any>(null);
     const [error, setError] = React.useState<string | null>(null);
     const form = useFormContext<CalculatorValues>();
 
@@ -299,19 +166,18 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
         const { poids, hbInitial } = formValues;
 
         if (!poids || !bsa || !debitTheoriqueLmin || !hbInitial) {
-             setError("Veuillez remplir Poids, Taille et Hb initiale pour lancer l'analyse.");
-             setLoading(false);
-             return;
+            setError("Veuillez remplir Poids, Taille et Hb initiale pour lancer l'analyse.");
+            setLoading(false);
+            return;
         }
 
         try {
-            const input: OptimizePerfusionInput = {
-                poids: Number(poids),
+            const input: PerfusionInput = {
                 surfaceCorporelle: Number(bsa),
-                debitCec: Number(debitTheoriqueLmin),
-                hb: Number(hbInitial),
+                indexCardiaqueCible: 2.4, // Default target
+                temperature: 36
             };
-            const optimization = await optimizePerfusion(input);
+            const optimization = await aiPredictionService.optimizePerfusion(input);
             setResult(optimization);
         } catch (e) {
             console.error(e);
@@ -326,29 +192,28 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-primary">
                     <Activity />
-                    Optimisation de la Perfusion
+                    Optimisation de la Perfusion (TF.js)
                 </CardTitle>
                 <CardDescription>
-                   Calcul de la DO₂ critique, alerte de débit inadéquat et simulation de scénarios.
+                    Calcul de débit cible par tenseurs.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 {result && (
                     <div className="space-y-4">
-                        <Alert variant={!result.isAdequate ? 'destructive' : 'default'}>
+                        <Alert>
                             <ShieldAlert className="h-4 w-4" />
-                            <AlertTitle>État de la Perfusion</AlertTitle>
+                            <AlertTitle>Débit Cible Calculé</AlertTitle>
                             <AlertDescription>
-                                {result.assessment}
+                                {result.recommendation}
                             </AlertDescription>
                         </Alert>
                         <div className="space-y-2">
-                             <ResultField label="DO₂ Calculée" value={result.do2.toFixed(2)} unit="ml/min/m²" />
-                             <p className="text-xs text-muted-foreground">{result.recommendation}</p>
-                         </div>
+                            <ResultField label="Target Flow" value={result.targetFlowRate} unit="L/min" />
+                        </div>
                     </div>
                 )}
-                 {error && (
+                {error && (
                     <Alert variant="destructive">
                         <AlertTitle>Erreur</AlertTitle>
                         <AlertDescription>{error}</AlertDescription>
@@ -356,9 +221,9 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
                 )}
             </CardContent>
             <CardFooter>
-                 <Button onClick={handleOptimization} disabled={loading}>
+                <Button onClick={handleOptimization} disabled={loading}>
                     {loading ? <Loader2 className="mr-2 animate-spin" /> : <Bot className="mr-2" />}
-                    Analyser la Perfusion
+                    Calculer
                 </Button>
             </CardFooter>
         </Card>
@@ -367,7 +232,7 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
 
 const ComplicationsPrediction = ({ hematocritePostPriming }: { hematocritePostPriming?: string }) => {
     const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState<ComplicationsPredictionOutput | null>(null);
+    const [result, setResult] = React.useState<any>(null);
     const [error, setError] = React.useState<string | null>(null);
     const form = useFormContext<CalculatorValues>();
 
@@ -386,14 +251,13 @@ const ComplicationsPrediction = ({ hematocritePostPriming }: { hematocritePostPr
         }
 
         try {
-            const input: ComplicationsPredictionInput = {
+            const input: ComplicationInput = {
                 age: Number(age),
-                poids: Number(poids),
-                hb: Number(hbInitial),
-                dureeCecMinutes: Number(dureeCec),
-                hemodilution: Number(hematocritePostPriming),
+                dureeCEC: Number(dureeCec),
+                dureeClampage: Number(dureeCec) * 0.7, // Estimate
+                euroscore: 2 // Default or add field
             };
-            const prediction = await predictComplications(input);
+            const prediction = await aiPredictionService.predictComplications(input);
             setResult(prediction);
         } catch (e) {
             console.error(e);
@@ -403,41 +267,28 @@ const ComplicationsPrediction = ({ hematocritePostPriming }: { hematocritePostPr
         }
     };
 
-    const getRiskVariant = (risk: 'Faible' | 'Modéré' | 'Élevé') => {
-        if (risk === 'Élevé') return 'destructive';
-        if (risk === 'Modéré') return 'default'; // yellow would be better
-        return 'default';
-    }
-
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-primary">
                     <ShieldAlert />
-                    Prédiction des Complications
+                    Prédiction des Complications (TF.js)
                 </CardTitle>
                 <CardDescription>
-                    Analyse des risques d'hypotension, de SIRS, et de coagulopathie.
+                    Score de risque calculé.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 {result && (
                     <div className="space-y-4">
-                        <Alert variant={getRiskVariant(result.hypotension.risk)}>
-                            <AlertTitle>Risque d'Hypotension: {result.hypotension.risk}</AlertTitle>
-                            <AlertDescription>{result.hypotension.assessment}</AlertDescription>
+                        <Alert variant={result.riskCategory === 'Élevé' ? 'destructive' : 'default'}>
+                            <AlertTitle>Risque Global: {result.riskCategory}</AlertTitle>
+                            <AlertDescription>{result.details}</AlertDescription>
                         </Alert>
-                         <Alert variant={getRiskVariant(result.sirs.risk)}>
-                            <AlertTitle>Risque de SIRS: {result.sirs.risk}</AlertTitle>
-                            <AlertDescription>{result.sirs.assessment}</AlertDescription>
-                        </Alert>
-                         <Alert variant={getRiskVariant(result.coagulopathie.risk)}>
-                            <AlertTitle>Risque de Coagulopathie: {result.coagulopathie.risk}</AlertTitle>
-                            <AlertDescription>{result.coagulopathie.assessment}</AlertDescription>
-                        </Alert>
+                        <ResultField label="Score" value={result.riskScore} unit="/ 100" />
                     </div>
                 )}
-                 {error && (
+                {error && (
                     <Alert variant="destructive">
                         <AlertTitle>Erreur</AlertTitle>
                         <AlertDescription>{error}</AlertDescription>
@@ -445,9 +296,9 @@ const ComplicationsPrediction = ({ hematocritePostPriming }: { hematocritePostPr
                 )}
             </CardContent>
             <CardFooter>
-                 <Button onClick={handlePrediction} disabled={loading}>
+                <Button onClick={handlePrediction} disabled={loading}>
                     {loading ? <Loader2 className="mr-2 animate-spin" /> : <Bot className="mr-2" />}
-                    Analyser les Risques
+                    Calculer le Risque
                 </Button>
             </CardFooter>
         </Card>
@@ -455,212 +306,6 @@ const ComplicationsPrediction = ({ hematocritePostPriming }: { hematocritePostPr
 };
 
 
-const AcidBaseAnalysis = () => {
-    const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState<AcidBaseAnalysisOutput | null>(null);
-    const [error, setError] = React.useState<string | null>(null);
-    const { getValues } = useFormContext<CalculatorValues>();
-
-    const handleAnalysis = async () => {
-        setLoading(true);
-        setError(null);
-        setResult(null);
-
-        const formValues = getValues();
-        const { poids, ph, paco2, hco3, k, hematocriteInitial } = formValues;
-
-        if (!poids || !ph || !paco2 || !hco3 || !k || !hematocriteInitial) {
-            setError("Veuillez remplir Poids et toutes les valeurs de gaz du sang pour lancer l'analyse.");
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const input: AcidBaseAnalysisInput = {
-                poids: Number(poids),
-                ph: Number(ph),
-                paco2: Number(paco2),
-                hco3: Number(hco3),
-                k: Number(k),
-                hematocrite: Number(hematocriteInitial),
-            };
-            const analysis = await analyzeAcidBase(input);
-            setResult(analysis);
-        } catch (e) {
-            console.error(e);
-            setError("Une erreur est survenue lors de l'analyse acido-basique.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-primary">
-                    <FlaskConical />
-                    Gestion Acido-Basique & Électrolytique
-                </CardTitle>
-                <CardDescription>
-                    Détection des troubles, proposition de correction pour le bicarbonate et les électrolytes.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                {result && (
-                    <div className="space-y-4">
-                        <Alert>
-                            <Lightbulb className="h-4 w-4" />
-                            <AlertTitle>{result.acidBaseStatus.status}</AlertTitle>
-                            <AlertDescription>{result.acidBaseStatus.assessment}</AlertDescription>
-                        </Alert>
-                        <Alert>
-                            <Lightbulb className="h-4 w-4" />
-                            <AlertTitle>{result.electrolyteStatus.status}</AlertTitle>
-                            <AlertDescription>{result.electrolyteStatus.assessment}</AlertDescription>
-                        </Alert>
-                        <Separator />
-                        <div className="space-y-2">
-                             <p className="font-semibold">Recommandations de Correction :</p>
-                             <ul className="list-disc list-inside space-y-1 text-sm">
-                                {result.recommendations.map((rec, i) => (
-                                    <li key={i}>{rec}</li>
-                                ))}
-                             </ul>
-                         </div>
-                    </div>
-                )}
-                 {error && (
-                    <Alert variant="destructive">
-                        <AlertTitle>Erreur</AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                )}
-            </CardContent>
-            <CardFooter>
-                 <Button onClick={handleAnalysis} disabled={loading}>
-                    {loading ? <Loader2 className="mr-2 animate-spin" /> : <Bot className="mr-2" />}
-                    Analyser
-                </Button>
-            </CardFooter>
-        </Card>
-    );
-};
-
-const ComprehensiveAssistant = ({ allData }: { allData: any }) => {
-    const [loading, setLoading] = React.useState(false);
-    const [result, setResult] = React.useState<CecPlanOutput | null>(null);
-    const [error, setError] = React.useState<string | null>(null);
-    const form = useFormContext<CalculatorValues>();
-
-    const handleGeneration = async () => {
-        setLoading(true);
-        setError(null);
-        setResult(null);
-
-        const formValues = form.getValues();
-        const requiredFields: (keyof CalculatorValues)[] = ['poids', 'taille', 'sexe', 'age', 'hematocriteInitial', 'hbInitial', 'volumePriming', 'dureeCec'];
-        const missingFields = requiredFields.filter(field => !formValues[field]);
-        
-        if (missingFields.length > 0) {
-            setError(`Veuillez remplir les champs suivants pour une analyse complète : ${missingFields.join(', ')}.`);
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const input: CecPlanInput = {
-                poids: Number(formValues.poids),
-                taille: Number(formValues.taille),
-                sexe: formValues.sexe,
-                age: Number(formValues.age),
-                hematocriteInitial: Number(formValues.hematocriteInitial),
-                hbInitial: Number(formValues.hbInitial),
-                volumePriming: Number(formValues.volumePriming),
-                dureeCec: Number(formValues.dureeCec),
-                ph: formValues.ph ? Number(formValues.ph) : undefined,
-                paco2: formValues.paco2 ? Number(formValues.paco2) : undefined,
-                hco3: formValues.hco3 ? Number(formValues.hco3) : undefined,
-                k: formValues.k ? Number(formValues.k) : undefined,
-                bsa: allData.bsa ? Number(allData.bsa) : undefined,
-                debitTheorique: allData.debitTheoriqueLmin ? Number(allData.debitTheoriqueLmin) : undefined,
-                hematocritePostPriming: allData.hematocritePostPriming ? Number(allData.hematocritePostPriming) : undefined,
-            };
-            
-            const cecPlan = await generateCecPlan(input);
-            setResult(cecPlan);
-
-        } catch (e) {
-            console.error(e);
-            setError("Une erreur est survenue lors de la génération du plan.");
-        } finally {
-            setLoading(false);
-        }
-    };
-    
-    const getRiskVariant = (risk: 'Faible' | 'Modéré' | 'Élevé') => {
-        if (risk === 'Élevé') return 'destructive';
-        if (risk === 'Modéré') return 'default';
-        return 'default';
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-primary">
-                    <Bot />
-                    Assistant Décisionnel IA Complet
-                </CardTitle>
-                <CardDescription>
-                    Génération d'un plan de CEC personnalisé et alertes prédictives en temps réel.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                 {result && (
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="font-bold text-lg mb-2">Alertes Principales</h3>
-                            <div className="space-y-2">
-                                {result.alerts.map((alert, index) => (
-                                    <Alert key={index} variant={getRiskVariant(alert.riskLevel)}>
-                                        <ShieldAlert className="h-4 w-4" />
-                                        <AlertTitle>Risque {alert.riskLevel}</AlertTitle>
-                                        <AlertDescription>{alert.description}</AlertDescription>
-                                    </Alert>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="font-bold text-lg mb-2">Plan de CEC Recommandé</h3>
-                            <div className="space-y-4">
-                                {result.plan.map((section, index) => (
-                                    <div key={index} className="p-4 bg-muted/50 rounded-lg">
-                                        <h4 className="font-semibold mb-2">{section.title}</h4>
-                                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                                            {section.content.map((item, i) => <li key={i}>{item}</li>)}
-                                        </ul>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-                 {error && (
-                    <Alert variant="destructive">
-                        <AlertTitle>Erreur</AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                )}
-            </CardContent>
-            <CardFooter>
-                 <Button onClick={handleGeneration} disabled={loading}>
-                    {loading ? <Loader2 className="mr-2 animate-spin" /> : <Bot className="mr-2" />}
-                    Générer le Plan de CEC
-                </Button>
-            </CardFooter>
-        </Card>
-    );
-};
 
 
 export default function FeaturesPage() {
@@ -684,7 +329,7 @@ export default function FeaturesPage() {
         },
         mode: 'onChange',
     });
-    
+
     const poids = form.watch('poids');
     const taille = form.watch('taille');
     const sexe = form.watch('sexe');
@@ -698,7 +343,7 @@ export default function FeaturesPage() {
 
         if (p > 0 && t > 0) {
             const bsa = 0.007184 * Math.pow(t, 0.725) * Math.pow(p, 0.425);
-            
+
             let ebv = 0;
             const tailleM = t / 100;
             if (sexe === 'homme') {
@@ -718,7 +363,7 @@ export default function FeaturesPage() {
             }
 
             const debitTheoriqueLmin = bsa * 2.4;
-            
+
             setResults({
                 bsa: bsa.toFixed(2),
                 ebv: ebv.toFixed(2),
@@ -739,8 +384,8 @@ export default function FeaturesPage() {
             <header className="bg-card shadow-sm">
                 <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
                     <div className="flex items-center gap-3">
-                         <BrainCircuit className="h-8 w-8 text-primary" />
-                         <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                        <BrainCircuit className="h-8 w-8 text-primary" />
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
                             Assistant Calculs & Prédictions IA
                         </h1>
                     </div>
@@ -750,7 +395,7 @@ export default function FeaturesPage() {
                 </div>
             </header>
             <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-               <FormProvider {...form}>
+                <FormProvider {...form}>
                     <form className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                         {/* Colonne d'inputs */}
                         <div className="lg:col-span-1 space-y-6">
@@ -762,7 +407,7 @@ export default function FeaturesPage() {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                     <FormField
+                                    <FormField
                                         control={form.control}
                                         name="poids"
                                         render={({ field }) => (
@@ -810,30 +455,30 @@ export default function FeaturesPage() {
                                             </FormItem>
                                         )}
                                     />
-                                     <FormField
+                                    <FormField
                                         control={form.control}
                                         name="sexe"
                                         render={({ field }) => (
                                             <FormItem>
-                                            <FormLabel>Sexe</FormLabel>
-                                            <FormControl>
-                                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 pt-2">
-                                                <FormItem className="flex items-center space-x-2">
-                                                    <FormControl><RadioGroupItem value="homme" /></FormControl>
-                                                    <FormLabel className="font-normal">Homme</FormLabel>
-                                                </FormItem>
-                                                <FormItem className="flex items-center space-x-2">
-                                                    <FormControl><RadioGroupItem value="femme" /></FormControl>
-                                                    <FormLabel className="font-normal">Femme</FormLabel>
-                                                </FormItem>
-                                                </RadioGroup>
-                                            </FormControl>
+                                                <FormLabel>Sexe</FormLabel>
+                                                <FormControl>
+                                                    <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 pt-2">
+                                                        <FormItem className="flex items-center space-x-2">
+                                                            <FormControl><RadioGroupItem value="homme" /></FormControl>
+                                                            <FormLabel className="font-normal">Homme</FormLabel>
+                                                        </FormItem>
+                                                        <FormItem className="flex items-center space-x-2">
+                                                            <FormControl><RadioGroupItem value="femme" /></FormControl>
+                                                            <FormLabel className="font-normal">Femme</FormLabel>
+                                                        </FormItem>
+                                                    </RadioGroup>
+                                                </FormControl>
                                             </FormItem>
                                         )}
-                                        />
+                                    />
                                 </CardContent>
                             </Card>
-                             <Card>
+                            <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
                                         <Pipette className="h-5 w-5" />
@@ -841,7 +486,7 @@ export default function FeaturesPage() {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                     <FormField
+                                    <FormField
                                         control={form.control}
                                         name="hematocriteInitial"
                                         render={({ field }) => (
@@ -850,7 +495,7 @@ export default function FeaturesPage() {
                                                 <FormControl>
                                                     <div className="relative">
                                                         <Input type="number" placeholder="ex: 42" {...field} value={field.value ?? ''} />
-                                                         <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">%</span>
+                                                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">%</span>
                                                     </div>
                                                 </FormControl>
                                                 <FormMessage />
@@ -866,7 +511,7 @@ export default function FeaturesPage() {
                                                 <FormControl>
                                                     <div className="relative">
                                                         <Input type="number" placeholder="ex: 14" {...field} value={field.value ?? ''} />
-                                                         <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">g/dL</span>
+                                                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">g/dL</span>
                                                     </div>
                                                 </FormControl>
                                                 <FormMessage />
@@ -880,7 +525,7 @@ export default function FeaturesPage() {
                                             <FormItem>
                                                 <FormLabel className="flex items-center gap-2">Volume du priming</FormLabel>
                                                 <FormControl>
-                                                     <div className="relative">
+                                                    <div className="relative">
                                                         <Input type="number" placeholder="ex: 1500" {...field} value={field.value ?? ''} />
                                                         <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">ml</span>
                                                     </div>
@@ -896,7 +541,7 @@ export default function FeaturesPage() {
                                             <FormItem>
                                                 <FormLabel className="flex items-center gap-2">Durée CEC prévue</FormLabel>
                                                 <FormControl>
-                                                     <div className="relative">
+                                                    <div className="relative">
                                                         <Input type="number" placeholder="ex: 90" {...field} value={field.value ?? ''} />
                                                         <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">min</span>
                                                     </div>
@@ -907,7 +552,7 @@ export default function FeaturesPage() {
                                     />
                                 </CardContent>
                             </Card>
-                             <Card>
+                            <Card>
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
                                         <TestTube className="h-5 w-5" />
@@ -915,43 +560,43 @@ export default function FeaturesPage() {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                     <FormField control={form.control} name="ph" render={({ field }) => (
+                                    <FormField control={form.control} name="ph" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>pH</FormLabel>
                                             <FormControl><Input type="number" step="0.01" placeholder="ex: 7.40" {...field} value={field.value ?? ''} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
-                                     )} />
-                                     <FormField control={form.control} name="paco2" render={({ field }) => (
+                                    )} />
+                                    <FormField control={form.control} name="paco2" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>PaCO₂</FormLabel>
                                             <FormControl><Input type="number" placeholder="ex: 40" {...field} value={field.value ?? ''} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
-                                     )} />
-                                      <FormField control={form.control} name="hco3" render={({ field }) => (
+                                    )} />
+                                    <FormField control={form.control} name="hco3" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>HCO₃⁻</FormLabel>
                                             <FormControl><Input type="number" placeholder="ex: 24" {...field} value={field.value ?? ''} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
-                                     )} />
-                                      <FormField control={form.control} name="k" render={({ field }) => (
+                                    )} />
+                                    <FormField control={form.control} name="k" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>K⁺ (Potassium)</FormLabel>
                                             <FormControl><Input type="number" step="0.1" placeholder="ex: 4.2" {...field} value={field.value ?? ''} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
-                                     )} />
+                                    )} />
                                 </CardContent>
                             </Card>
                         </div>
-                        
+
                         {/* Colonne de résultats */}
                         <div className="lg:col-span-2 space-y-6">
                             <Card>
                                 <CardHeader>
-                                     <CardTitle className="flex items-center gap-2 text-primary">
+                                    <CardTitle className="flex items-center gap-2 text-primary">
                                         <Calculator />
                                         Calculs Physiologiques
                                     </CardTitle>
@@ -971,23 +616,29 @@ export default function FeaturesPage() {
                                     </div>
                                 </CardContent>
                             </Card>
-                            <ComprehensiveAssistant allData={results} />
+
                             <HematologyPrediction />
-                            <PerfusionOptimization 
-                                bsa={results.bsa}
-                                debitTheoriqueLmin={results.debitTheoriqueLmin}
-                            />
-                            <ComplicationsPrediction 
-                                hematocritePostPriming={results.hematocritePostPriming}
-                            />
-                            <AcidBaseAnalysis />
+                            <PerfusionOptimization bsa={results.bsa} debitTheoriqueLmin={results.debitTheoriqueLmin} />
+                            <ComplicationsPrediction hematocritePostPriming={results.hematocritePostPriming} />
                         </div>
                     </form>
-               </FormProvider>
+                </FormProvider>
+
+                {/* Global AI Assistant Section */}
+                <div className="mt-12 space-y-6 border-t pt-12">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-primary/10 p-2 rounded-lg">
+                            <Sparkles className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tight">Assistant IA Clinique Global</h2>
+                            <p className="text-sm text-muted-foreground">Expertise en temps réel basée sur les standards internationaux (EACTS, SCTS, AHA).</p>
+                        </div>
+                    </div>
+                    <KnowledgeBase />
+                </div>
             </main>
         </>
     );
-
 }
 
-    

@@ -22,14 +22,15 @@ interface PrimingTotals {
     total: number;
 }
 
-const equipmentFields: Array<{ name: UtilityCategory; label: string }> = [
-    { name: 'oxygenateur', label: 'Oxygénateur' },
-    { name: 'circuit', label: 'Circuit' },
-    { name: 'canule_art', label: 'Canule Artérielle' },
-    { name: 'canule_vein', label: 'Canule Veineuse' },
-    { name: 'canule_cardio', label: 'Canule Cardioplégie' },
-    { name: 'canule_decharge', label: 'Canule Décharge' },
-    { name: 'kit_hemo', label: 'Kit Hémofiltration' },
+const equipmentFields: Array<{ name: keyof CecFormValues; category: UtilityCategory; label: string }> = [
+    { name: 'oxygenateur', category: 'oxygenateur', label: 'Oxygénateur' },
+    { name: 'circuit', category: 'circuit', label: 'Circuit' },
+    { name: 'canule_art', category: 'canule_art', label: 'Canule Artérielle' },
+    { name: 'canule_vein', category: 'canule_vein', label: 'Canule Veineuse' },
+    { name: 'canule_vein_2', category: 'canule_vein', label: 'Canule Veineuse 2' },
+    { name: 'canule_cardio', category: 'canule_cardio', label: 'Canule Cardioplégie' },
+    { name: 'canule_decharge', category: 'canule_decharge', label: 'Canule Décharge' },
+    { name: 'kit_hemo', category: 'kit_hemo', label: 'Kit Hémofiltration' },
 ];
 
 
@@ -49,7 +50,7 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
       name: "priming",
     });
 
-    const equipmentCategories = React.useMemo(() => equipmentFields.map(f => f.name), []);
+    const equipmentCategories = React.useMemo(() => Array.from(new Set(equipmentFields.map(f => f.category))), []);
     const { data: equipmentOptions, isLoading: isLoadingEquipment } = useQuery({
         queryKey: ['utilities', equipmentCategories],
         queryFn: () => getUtilities(equipmentCategories),
@@ -114,10 +115,10 @@ export function MaterielTab({ isReadOnly }: MaterielTabProps) {
                                         <FormLabel>{item.label}</FormLabel>
                                         <FormControl>
                                             <Combobox
-                                                category={item.name}
-                                                value={field.value ?? ""}
+                                                category={item.category}
+                                                value={(field.value as string) ?? ""}
                                                 onChange={field.onChange}
-                                                options={equipmentOptions?.[item.name] ?? []}
+                                                options={equipmentOptions?.[item.category] ?? []}
                                                 disabled={isReadOnly || isLoadingEquipment}
                                             />
                                         </FormControl>

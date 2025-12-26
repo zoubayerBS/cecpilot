@@ -159,6 +159,7 @@ export const cecFormSchema = z.object({
     circuit: z.string().optional(),
     canule_art: z.string().optional(),
     canule_vein: z.string().optional(),
+    canule_vein_2: z.string().optional(),
     canule_cardio: z.string().optional(),
     canule_decharge: z.string().optional(),
     kit_hemo: z.string().optional(),

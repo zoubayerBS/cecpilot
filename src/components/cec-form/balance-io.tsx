@@ -12,6 +12,11 @@ import { Scale } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Progress } from '../ui/progress';
 
+import { aiPredictionService } from '@/services/ai-prediction';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Brain } from "lucide-react";
+
 export function BalanceIO() {
     const { control, setValue } = useFormContext<CecFormValues>();
 
@@ -33,7 +38,10 @@ export function BalanceIO() {
             'sorties_sang_pompe_residuel'
         ]
     });
-    
+
+    // Also watch duration to provide context (optional)
+    const dureeCec = useWatch({ control, name: 'duree_cec' });
+
     const bloodGases = useWatch({ control, name: 'bloodGases' });
 
     const totalEntrees = React.useMemo(() => {
@@ -63,6 +71,24 @@ export function BalanceIO() {
     const entreesPercentage = grandTotal > 0 ? (totalEntrees / grandTotal) * 100 : 0;
     const sortiesPercentage = grandTotal > 0 ? (totalSorties / grandTotal) * 100 : 0;
 
+    // AI Analysis
+    const [balanceAnalysis, setBalanceAnalysis] = React.useState<{ suggestion: string, status: string, balance: number } | null>(null);
+
+    React.useEffect(() => {
+        const runAnalysis = async () => {
+            if (totalEntrees > 0 || totalSorties > 0) {
+                const analysis = await aiPredictionService.analyzeBalance({
+                    totalEntrees,
+                    totalSorties
+                });
+                setBalanceAnalysis(analysis);
+            } else {
+                setBalanceAnalysis(null);
+            }
+        };
+        runAnalysis();
+    }, [totalEntrees, totalSorties]);
+
 
     return (
         <Card>
@@ -82,17 +108,17 @@ export function BalanceIO() {
                                 <TableRow>
                                     <TableCell className="font-medium">Apports anesthésiques</TableCell>
                                     <TableCell className="w-1/3">
-                                         <FormField
+                                        <FormField
                                             control={control}
                                             name="entrees_apports_anesthesiques"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : +e.target.value)} className="pr-10" />
-                                                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">ml</span>
-                                                    </div>
-                                                </FormControl>
+                                                    <FormControl>
+                                                        <div className="relative">
+                                                            <Input type="number" {...field} value={field.value ?? ''} onChange={e => field.onChange(e.target.value === '' ? undefined : +e.target.value)} className="pr-10" />
+                                                            <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sm text-muted-foreground">ml</span>
+                                                        </div>
+                                                    </FormControl>
                                                 </FormItem>
                                             )}
                                         />
@@ -105,7 +131,7 @@ export function BalanceIO() {
                                             control={control}
                                             name="entrees_priming"
                                             render={({ field }) => (
-                                                 <FormItem>
+                                                <FormItem>
                                                     <FormControl>
                                                         <div className="relative">
                                                             <Input readOnly type="number" {...field} value={field.value ?? ''} className="pr-10 bg-muted" />
@@ -120,11 +146,11 @@ export function BalanceIO() {
                                 <TableRow>
                                     <TableCell className="font-medium">Cardioplégie</TableCell>
                                     <TableCell>
-                                         <FormField
+                                        <FormField
                                             control={control}
                                             name="entrees_cardioplegie"
                                             render={({ field }) => (
-                                                 <FormItem>
+                                                <FormItem>
                                                     <FormControl>
                                                         <div className="relative">
                                                             <Input readOnly type="number" {...field} value={field.value ?? ''} className="pr-10 bg-muted" />
@@ -197,7 +223,7 @@ export function BalanceIO() {
                                 <TableRow>
                                     <TableCell className="font-medium">Sang du pompe résiduel</TableCell>
                                     <TableCell>
-                                         <FormField control={control} name="sorties_sang_pompe_residuel" render={({ field }) => (
+                                        <FormField control={control} name="sorties_sang_pompe_residuel" render={({ field }) => (
                                             <FormItem>
                                                 <FormControl>
                                                     <div className="relative">
@@ -224,7 +250,7 @@ export function BalanceIO() {
                         </div>
                         <Progress value={entreesPercentage} className="h-2 [&>div]:bg-red-500" />
                     </div>
-                     <div className="space-y-2">
+                    <div className="space-y-2">
                         <div className="flex justify-between items-center bg-muted p-2 rounded-md">
                             <span>Total Sorties :</span>
                             <span>{totalSorties} ml</span>
@@ -232,10 +258,27 @@ export function BalanceIO() {
                         <Progress value={sortiesPercentage} className="h-2 [&>div]:bg-blue-500" />
                     </div>
                 </div>
-                 <Separator />
+                <Separator />
                 <div className="text-center font-bold text-xl bg-card p-3 rounded-md shadow-inner">
                     Bilan Total : {totalEntrees - totalSorties} ml
                 </div>
+
+                {/* AI Balance Analysis */}
+                {balanceAnalysis && (
+                    <Alert className={`mt-4 ${balanceAnalysis.status === 'overload' ? 'border-red-500 bg-red-50 text-red-900' : balanceAnalysis.status === 'positive' ? 'border-yellow-500 bg-yellow-50 text-yellow-900' : 'border-green-500 bg-green-50 text-green-900'}`}>
+                        <Brain className="h-4 w-4" />
+                        <AlertTitle className="flex items-center gap-2">
+                            Analyse Volémique
+                            <Badge variant={balanceAnalysis.status === 'overload' || balanceAnalysis.status === 'negative' ? 'destructive' : 'outline'}>
+                                {balanceAnalysis.balance > 0 ? '+' : ''}{balanceAnalysis.balance} ml
+                            </Badge>
+                        </AlertTitle>
+                        <AlertDescription>
+                            {balanceAnalysis.suggestion}
+                        </AlertDescription>
+                    </Alert>
+                )}
+
             </CardFooter>
         </Card>
     );

@@ -9,6 +9,8 @@ import { List, Trash2, PlusCircle, Loader2 } from 'lucide-react';
 import { getUtilityList, addUtilityItem, deleteUtilityItem } from '@/services/utilities';
 import { useToast } from '@/hooks/use-toast';
 import type { UtilityCategory } from '@/components/cec-form/schema';
+import { TensorFlowMonitor } from '@/components/tools/tensorflow-monitor';
+import { BrainCircuit } from 'lucide-react';
 
 const utilityCategories: { id: UtilityCategory, name: string, description: string }[] = [
     { id: 'interventions', name: 'Interventions', description: "Gérez la liste des interventions chirurgicales." },
@@ -122,6 +124,8 @@ function UtilityManager({ category, name, description }: { category: UtilityCate
 }
 
 
+
+
 export default function UtilitiesPage() {
     return (
         <>
@@ -131,22 +135,34 @@ export default function UtilitiesPage() {
                         <List />
                         Gestion des Utilitaires
                     </h1>
-                     <p className="mt-2 text-sm text-muted-foreground">
+                    <p className="mt-2 text-sm text-muted-foreground">
                         Gérez les listes déroulantes utilisées dans les formulaires de compte rendu.
                     </p>
                 </div>
             </header>
-            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {utilityCategories.map(cat => (
-                        <UtilityManager 
-                            key={cat.id} 
-                            category={cat.id}
-                            name={cat.name}
-                            description={cat.description}
-                        />
-                    ))}
-                 </div>
+            <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-8">
+
+                <section>
+                    <div className="flex items-center gap-2 mb-4">
+                        <BrainCircuit className="h-6 w-6 text-primary" />
+                        <h2 className="text-xl font-semibold">État Système AI (TensorFlow.js)</h2>
+                    </div>
+                    <TensorFlowMonitor />
+                </section>
+
+                <section>
+                    <h2 className="text-xl font-semibold mb-4 flex items-center gap-2"><List className="h-5 w-5" /> Listes de Configuration</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {utilityCategories.map(cat => (
+                            <UtilityManager
+                                key={cat.id}
+                                category={cat.id}
+                                name={cat.name}
+                                description={cat.description}
+                            />
+                        ))}
+                    </div>
+                </section>
             </main>
         </>
     );
