@@ -5,6 +5,7 @@ import { cecForms, sessions, users } from '@/lib/db/schema';
 import type { CecFormValues } from '@/components/cec-form/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
+import { parse, differenceInMinutes, isValid } from 'date-fns';
 
 export type CecReport = Omit<CecFormValues, 'createdAt' | 'updatedAt'> & {
   id: string;
@@ -107,7 +108,7 @@ export async function saveCecForm(
     if (id) {
       // Update existing document
       const db = getDb();
-    const updatedForms = await db.update(cecForms)
+      const updatedForms = await db.update(cecForms)
         .set({ ...structuredData })
         .where(eq(cecForms.id, Number(id)))
         .returning({ updatedId: cecForms.id });
@@ -250,43 +251,43 @@ export async function deleteCecForm(id: string): Promise<void> {
 
 // #region Session Management
 export async function createSession(username: string): Promise<string> {
-    const token = Math.random().toString(36).substring(2);
-    const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours from now
+  const token = Math.random().toString(36).substring(2);
+  const expires = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours from now
 
-    const db = getDb();
-    await db.insert(sessions).values({
-        token,
-        username,
-        expires,
-    });
-    return token;
+  const db = getDb();
+  await db.insert(sessions).values({
+    token,
+    username,
+    expires,
+  });
+  return token;
 }
 
 export async function validateSession(token: string): Promise<{ username: string } | null> {
+  const db = getDb();
+  const sessionResult = await db.select().from(sessions).where(eq(sessions.token, token));
+
+  if (sessionResult.length === 0) {
+    return null;
+  }
+
+  const session = sessionResult[0];
+  const expires = session.expires;
+
+  if (expires && expires < new Date()) {
     const db = getDb();
-    const sessionResult = await db.select().from(sessions).where(eq(sessions.token, token));
+    await db.delete(sessions).where(eq(sessions.token, token)); // Clean up expired session
+    return null;
+  }
 
-    if (sessionResult.length === 0) {
-        return null;
-    }
-
-    const session = sessionResult[0];
-    const expires = session.expires;
-
-    if (expires && expires < new Date()) {
-        const db = getDb();
-        await db.delete(sessions).where(eq(sessions.token, token)); // Clean up expired session
-        return null;
-    }
-
-    return { username: session.username! };
+  return { username: session.username! };
 }
 
 export async function deleteSession(token: string): Promise<void> {
-    const db = getDb();
-    await db.delete(sessions).where(eq(sessions.token, token)).catch(error => {
-        console.warn("Could not delete session, it might have already been removed:", error);
-    });
+  const db = getDb();
+  await db.delete(sessions).where(eq(sessions.token, token)).catch(error => {
+    console.warn("Could not delete session, it might have already been removed:", error);
+  });
 }
 // #endregion
 
@@ -333,8 +334,8 @@ export async function verifyUserPassword(username: string, password: string): Pr
       id: users.id,
       username: users.username
     })
-    .from(users)
-    .where(sql`${users.username} = ${username} AND ${users.password} = crypt(${password}, ${users.password})`);
+      .from(users)
+      .where(sql`${users.username} = ${username} AND ${users.password} = crypt(${password}, ${users.password})`);
 
     if (result.length > 0) {
       return result[0];
@@ -347,3 +348,80 @@ export async function verifyUserPassword(username: string, password: string): Pr
   }
 }
 
+
+export async function repairMissingDurations(): Promise<{ updated: number, errors: number }> {
+  try {
+    const db = getDb();
+    const reports = await db.select().from(cecForms);
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    for (const report of reports) {
+      const timeline = report.timeline as any[] || [];
+      const deroulement = report.deroulement as any || {};
+
+      let needsUpdate = false;
+      const newDeroulement = { ...deroulement };
+
+      const findTime = (type: string) => {
+        const event = timeline.find(e => e.type === type);
+        if (!event?.time) return null;
+        try {
+          return parse(event.time, 'HH:mm', new Date());
+        } catch (e) {
+          return null;
+        }
+      };
+
+      // Fix CEC Duration
+      if (!deroulement.duree_cec) {
+        const start = findTime('Départ CEC');
+        const end = findTime('Fin CEC');
+        if (start && end && isValid(start) && isValid(end)) {
+          const diff = differenceInMinutes(end, start);
+          newDeroulement.duree_cec = Math.max(0, diff).toString();
+          needsUpdate = true;
+        }
+      }
+
+      // Fix Clamping Duration
+      if (!deroulement.duree_clampage) {
+        const start = findTime('Clampage');
+        const end = findTime('Déclampage');
+        if (start && end && isValid(start) && isValid(end)) {
+          const diff = differenceInMinutes(end, start);
+          newDeroulement.duree_clampage = Math.max(0, diff).toString();
+          needsUpdate = true;
+        }
+      }
+
+      // Fix Assistance Duration (Déclampage to Fin CEC)
+      if (!deroulement.duree_assistance) {
+        const start = findTime('Déclampage');
+        const end = findTime('Fin CEC');
+        if (start && end && isValid(start) && isValid(end)) {
+          const diff = differenceInMinutes(end, start);
+          newDeroulement.duree_assistance = Math.max(0, diff).toString();
+          needsUpdate = true;
+        }
+      }
+
+      if (needsUpdate) {
+        try {
+          await db.update(cecForms)
+            .set({ deroulement: newDeroulement })
+            .where(eq(cecForms.id, report.id));
+          updatedCount++;
+        } catch (e) {
+          console.error(`Error updating report ${report.id}:`, e);
+          errorCount++;
+        }
+      }
+    }
+
+    return { updated: updatedCount, errors: errorCount };
+  } catch (error) {
+    console.error("Critical error during duration repair:", error);
+    throw error;
+  }
+}

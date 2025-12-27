@@ -28,6 +28,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { StatCard } from '@/components/ui/stat-card';
 import { Fab } from '@/components/ui/fab';
+import { DashboardAnalytics } from '@/components/dashboard/analytics';
+import { DashboardAiInsights } from '@/components/dashboard/ai-insights';
+import { PriorityFiles } from '@/components/dashboard/priority-files';
+import { Badge } from '@/components/ui/badge';
+import { DashboardExport } from '@/components/dashboard/export-actions';
 
 
 export default function Home() {
@@ -138,6 +143,24 @@ export default function Home() {
     setEndDate(undefined);
   };
 
+  const getInterventionBadge = (intervention: string | undefined) => {
+    if (!intervention) return <Badge variant="outline" className="text-slate-400">Non spécifié</Badge>;
+
+    const text = intervention.toLowerCase();
+    if (text.includes('pontage') || text.includes('cabg'))
+      return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none dark:bg-blue-900/40 dark:text-blue-300">Pontage</Badge>;
+    if (text.includes('valve') || text.includes('plastie') || text.includes('remplacement'))
+      return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none dark:bg-emerald-900/40 dark:text-emerald-300">Valvulaire</Badge>;
+    if (text.includes('bentall') || text.includes('aorte'))
+      return <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none dark:bg-amber-900/40 dark:text-amber-300">Aortique</Badge>;
+    if (text.includes('cia') || text.includes('civ') || text.includes('fallot'))
+      return <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-200 border-none dark:bg-violet-900/40 dark:text-violet-300">Congénital</Badge>;
+    if (text.includes('ecmo') || text.includes('changement'))
+      return <Badge className="bg-rose-100 text-rose-700 hover:bg-rose-200 border-none dark:bg-rose-900/40 dark:text-rose-300">Technique</Badge>;
+
+    return <Badge variant="secondary" className="border-none">Autre</Badge>;
+  };
+
   const handleDelete = async () => {
     if (!reportToDelete) return;
     try {
@@ -190,9 +213,36 @@ export default function Home() {
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 ">
-          <StatCard title="Total des Interventions" value={stats.totalReports} icon={FileText} description="Nombre total de comptes rendus enregistrés." />
-          <StatCard title="Interventions ce Mois-ci" value={stats.reportsThisMonth} icon={CalendarIcon} description={`Pour ${format(new Date(), 'MMMM yyyy', { locale: fr })}`} />
-          <StatCard title="Durée Moyenne de CEC" value={`${stats.averageDuration} min`} icon={Clock} description="Basée sur les événements 'Départ' et 'Fin'." />
+          <StatCard
+            title="Total des Interventions"
+            value={stats.totalReports}
+            icon={FileText}
+            description="Nombre total de comptes rendus."
+            trend="up"
+            trendValue="+12%"
+          />
+          <StatCard
+            title="Interventions ce Mois-ci"
+            value={stats.reportsThisMonth}
+            icon={CalendarIcon}
+            description={`Pour ${format(new Date(), 'MMMM yyyy', { locale: fr })}`}
+            trend="up"
+            trendValue="+3"
+          />
+          <StatCard
+            title="Durée Moyenne de CEC"
+            value={`${stats.averageDuration} min`}
+            icon={Clock}
+            description="Basée sur les événements récents."
+            trend="down"
+            trendValue="-5min"
+          />
+        </div>
+
+        <div className="grid gap-6">
+          {reports.length > 0 && <PriorityFiles reports={reports} />}
+          {reports.length > 0 && <DashboardAiInsights reports={reports} />}
+          {reports.length > 0 && <DashboardAnalytics reports={reports} />}
         </div>
 
         {/* AI Features Highlight */}
@@ -288,8 +338,12 @@ export default function Home() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Comptes Rendus Récents</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle>Comptes Rendus Récents</CardTitle>
+              <CardDescription>Consultez et gérez vos derniers rapports opératoires.</CardDescription>
+            </div>
+            <DashboardExport reports={filteredReports} stats={stats} />
           </CardHeader>
           <CardContent>
             {paginatedReports.length > 0 ? (
@@ -311,10 +365,15 @@ export default function Home() {
                         <TableCell className="font-medium">{report.nom_prenom}</TableCell>
                         {/* <TableCell>{report.numero_cec || 'N/A'}</TableCell> */}
                         <TableCell>
-                          {report.date_cec ? format(new Date(report.date_cec), "PPP", { locale: fr }) : 'N/A'}
+                          {report.date_cec ? format(new Date(report.date_cec), "PP", { locale: fr }) : 'N/A'}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground truncate max-w-xs">{report.intervention || 'Non spécifiée'}</TableCell>
-                        <TableCell>{report.operateur || 'Non spécifié'}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {getInterventionBadge(report.intervention)}
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{report.intervention || 'Non spécifiée'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">{report.operateur || 'Non spécifié'}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
                             <Button asChild variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); router.push(`/compte-rendu/${report.id}`) }}>

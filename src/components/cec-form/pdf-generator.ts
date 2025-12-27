@@ -27,13 +27,24 @@ const formatValue = (value: any, unit?: string) => {
 }
 
 
-const FONT_SIZE_NORMAL = 10;
+const FONT_SIZE_NORMAL = 9;
 const FONT_SIZE_SMALL = 8;
-const FONT_SIZE_TITLE = 16;
+const FONT_SIZE_TITLE = 22;
+const FONT_SIZE_SUBTITLE = 14;
 const MARGIN = 15;
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+
+// Design System Colors
+const COLORS = {
+    primary: [37, 99, 235], // #2563eb Royal Blue
+    secondary: [100, 116, 139], // #64748b Slate
+    accent: [241, 245, 249], // #f1f5f9 Slate 50
+    text: [15, 23, 42], // #0f172a Slate 900
+    white: [255, 255, 255],
+    border: [226, 232, 240] // #e2e8f0
+};
 
 class DocBuilder {
     doc: jsPDF;
@@ -44,60 +55,171 @@ class DocBuilder {
         this.cursor = MARGIN;
     }
 
+    private setPrimaryColor() {
+        this.doc.setTextColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+    }
+
+    private setSecondaryColor() {
+        this.doc.setTextColor(COLORS.secondary[0], COLORS.secondary[1], COLORS.secondary[2]);
+    }
+
+    private setTextColor() {
+        this.doc.setTextColor(COLORS.text[0], COLORS.text[1], COLORS.text[2]);
+    }
+
     checkNewPage(height: number) {
-        if (this.cursor + height > PAGE_HEIGHT - MARGIN) {
+        if (this.cursor + height > PAGE_HEIGHT - MARGIN - 10) { // -10 for footer buffer
             this.doc.addPage();
             this.cursor = MARGIN;
         }
     }
 
-    addTitle(title: string) {
-        this.checkNewPage(20);
+    addHeader(data: CecFormValues) {
+        // Top Accent Bar
+        this.doc.setFillColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+        this.doc.rect(0, 0, PAGE_WIDTH, 6, 'F');
+
+        this.cursor = 25;
+
+        // Title Section
+        this.doc.setFont('helvetica', 'bold');
         this.doc.setFontSize(FONT_SIZE_TITLE);
-        this.doc.setFont('helvetica', 'bold');
-        this.doc.text(title, PAGE_WIDTH / 2, this.cursor, { align: 'center' });
-        this.cursor += 15;
-    }
-    
-    addSectionTitle(title: string) {
-        this.checkNewPage(12);
-        this.doc.setFontSize(12);
-        this.doc.setFont('helvetica', 'bold');
-        this.doc.text(title, MARGIN, this.cursor);
-        this.cursor += 6;
-        this.doc.setLineWidth(0.2);
-        this.doc.line(MARGIN, this.cursor - 2, MARGIN + CONTENT_WIDTH, this.cursor - 2);
-        this.cursor += 2;
-    }
-    
-    addText(text: string, label?: string) {
-        this.doc.setFontSize(FONT_SIZE_NORMAL);
-        const textToRender = text || 'N/A';
-        const labelWidth = label ? this.doc.getTextWidth(`${label}: `) + 2 : 0;
-        const textLines = this.doc.splitTextToSize(textToRender, CONTENT_WIDTH - labelWidth);
-        const textHeight = textLines.length * 5;
+        this.setTextColor();
+        this.doc.text('Rapport de Circulation', MARGIN, this.cursor);
 
-        this.checkNewPage(textHeight);
+        this.doc.setFont('helvetica', 'normal');
+        this.doc.setFontSize(FONT_SIZE_TITLE);
+        this.setPrimaryColor();
+        this.doc.text('Extra-Corporelle', MARGIN + 85, this.cursor);
 
-        if (label) {
-            this.doc.setFont('helvetica', 'bold');
-            this.doc.text(`${label}:`, MARGIN, this.cursor);
-            this.doc.setFont('helvetica', 'normal');
-            this.doc.text(textLines, MARGIN + labelWidth, this.cursor);
-        } else {
-            this.doc.setFont('helvetica', 'normal');
-            this.doc.text(textLines, MARGIN, this.cursor);
+        // Date & ID Badge right aligned
+        const dateStr = formatDate(data.date_cec);
+        this.doc.setFontSize(10);
+        this.setSecondaryColor();
+        this.doc.text(dateStr, PAGE_WIDTH - MARGIN, this.cursor, { align: 'right' });
+
+        this.cursor += 8;
+        this.doc.setFontSize(10);
+        this.doc.text(`N° CEC: ${data.numero_cec || 'N/A'}`, PAGE_WIDTH - MARGIN, this.cursor, { align: 'right' });
+
+        // Separator
+        this.cursor += 5;
+        this.doc.setDrawColor(COLORS.border[0], COLORS.border[1], COLORS.border[2]);
+        this.doc.line(MARGIN, this.cursor, PAGE_WIDTH - MARGIN, this.cursor);
+        this.cursor += 10;
+    }
+
+    addFooter() {
+        const pageCount = this.doc.getNumberOfPages();
+        this.doc.setFont('helvetica', 'italic');
+        this.doc.setFontSize(8);
+        this.setSecondaryColor();
+
+        for (let i = 1; i <= pageCount; i++) {
+            this.doc.setPage(i);
+            const footerText = `Généré par CECPilot - Page ${i} / ${pageCount}`;
+            this.doc.text(footerText, PAGE_WIDTH / 2, PAGE_HEIGHT - 10, { align: 'center' });
         }
-        this.cursor += textHeight + 2;
     }
-    
+
+    addSectionTitle(title: string) {
+        this.checkNewPage(15);
+        this.cursor += 5;
+
+        // Icon/Box accent
+        this.doc.setFillColor(COLORS.primary[0], COLORS.primary[1], COLORS.primary[2]);
+        this.doc.rect(MARGIN, this.cursor - 4, 3, 14, 'F'); // Vertical accent bar
+
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.setFontSize(12);
+        this.setPrimaryColor();
+        this.doc.text(title.toUpperCase(), MARGIN + 6, this.cursor + 5);
+
+        this.cursor += 12;
+    }
+
+    addGrid(items: { label: string, value: string }[], columns: number = 2) {
+        if (items.length === 0) return;
+
+        // Transform flat list of items into rows for the table
+        const body: any[] = [];
+        let currentRow: any[] = [];
+
+        items.forEach((item, index) => {
+            // Label cell
+            currentRow.push({
+                content: item.label,
+                styles: { fontStyle: 'bold', textColor: COLORS.secondary, halign: 'left', cellWidth: 40 }
+            });
+            // Value cell
+            currentRow.push({
+                content: item.value,
+                styles: { fontStyle: 'normal', textColor: COLORS.text, halign: 'left' }
+            });
+
+            // If row is full or last item
+            if ((index + 1) % columns === 0 || index === items.length - 1) {
+                // Determine if we need to pad the last row if it's incomplete (optional but looks better)
+                if (currentRow.length < columns * 2) {
+                    // Pad with empty cells
+                    const missingCells = (columns * 2) - currentRow.length;
+                    for (let i = 0; i < missingCells; i++) {
+                        currentRow.push("");
+                    }
+                }
+                body.push(currentRow);
+                currentRow = [];
+            }
+        });
+
+        // Use autoTable for the layout
+        autoTable(this.doc, {
+            body: body,
+            startY: this.cursor,
+            theme: 'plain', // No borders
+            styles: {
+                fontSize: FONT_SIZE_NORMAL,
+                cellPadding: 1.5,
+                overflow: 'linebreak', // Wrap text
+                font: 'helvetica'
+            },
+            columnStyles: {
+                // granular column control if needed, but cell styles handle it mostly
+            },
+            margin: { left: MARGIN, right: MARGIN },
+            didDrawPage: (data) => {
+                // Update cursor
+                this.cursor = data.cursor.y + 5;
+            },
+        });
+
+        // Update cursor after table
+        this.cursor = (this.doc as any).lastAutoTable.finalY + 5;
+    }
+
+    addText(text: string, label?: string) {
+        if (label) {
+            // Use grid for labeled single text to keep alignment consistent
+            this.addGrid([{ label, value: text }], 1);
+        } else {
+            this.doc.setFontSize(FONT_SIZE_NORMAL);
+            const textToRender = text || 'N/A';
+
+            const lines = this.doc.splitTextToSize(textToRender, CONTENT_WIDTH);
+            const height = lines.length * 5;
+            this.checkNewPage(height);
+
+            this.setTextColor();
+            this.doc.setFont('helvetica', 'normal');
+            this.doc.text(lines, MARGIN, this.cursor);
+            this.cursor += height + 5;
+        }
+    }
+
     addTable(head: any[], body: any[], title?: string) {
         if (title) {
-            this.checkNewPage(12);
-            this.doc.setFontSize(FONT_SIZE_NORMAL);
-            this.doc.setFont('helvetica', 'bold');
-            this.doc.text(title, MARGIN, this.cursor);
-            this.cursor += 6;
+            this.addSectionTitle(title);
+            this.cursor -= 2; // Closer section title
         }
 
         autoTable(this.doc, {
@@ -105,417 +227,228 @@ class DocBuilder {
             body,
             startY: this.cursor,
             theme: 'grid',
-            styles: { fontSize: FONT_SIZE_SMALL, cellPadding: 1.5 },
-            headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
+            styles: {
+                fontSize: FONT_SIZE_SMALL,
+                cellPadding: 3,
+                lineColor: COLORS.border as any,
+                lineWidth: 0.1,
+                font: 'helvetica'
+            },
+            headStyles: {
+                fillColor: COLORS.primary as any,
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'left'
+            },
+            columnStyles: {
+                0: { fontStyle: 'bold', textColor: COLORS.primary as any }
+            },
+            alternateRowStyles: {
+                fillColor: COLORS.accent as any
+            },
+            margin: { left: MARGIN, right: MARGIN },
             didDrawPage: (data) => {
-                this.cursor = data.cursor.y + 2;
+                this.cursor = data.cursor.y + 10;
             }
         });
         this.cursor = (this.doc as any).lastAutoTable.finalY + 10;
     }
-    
-    addKeyValueTable(items: { label: string, value: any }[][]) {
-        const body = items.map(row => row.map(cell => cell.label.includes("Total") ? { content: cell.label, styles: { fontStyle: 'bold' } } : cell.label).concat(row.map(cell => cell.value)));
-
-        const tableBody = items.flat().map(item => [item.label, item.value]);
-
-        const tableOptions = {
-            startY: this.cursor,
-            body: tableBody,
-            theme: 'plain' as const,
-            styles: { fontSize: FONT_SIZE_NORMAL },
-            columnStyles: {
-                0: { fontStyle: 'bold' as const, cellWidth: 50 },
-                1: { fontStyle: 'normal' as const },
-            },
-            didDrawPage: (data: any) => {
-                this.cursor = data.cursor.y + 2;
-            }
-        };
-
-        this.checkNewPage(tableBody.length * 8 + 10);
-        autoTable(this.doc, tableOptions);
-
-        this.cursor = (this.doc as any).lastAutoTable.finalY + 5;
-    }
-
 
     open(filename: string) {
-        this.doc.setProperties({ title: filename });
-        this.doc.output('dataurlnewwindow');
+        this.addFooter();
+        // User requested to open directly in browser
+        // building a blob url is often cleaner than dataurlnewwindow
+        const blob = this.doc.output('blob');
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+
+        // Clean up url after a delay to allow load? 
+        // Actually for blob urls usually we keep them or revoke later. 
+        // letting it stay is fine for this session.
     }
 
     asBlob(): Blob {
+        this.addFooter();
         return this.doc.output('blob');
     }
 }
 
 export async function generatePdf(data: CecFormValues) {
     const builder = new DocBuilder();
-    
-    builder.addTitle('Compte Rendu de Circulation Extra-Corporelle');
+    builder.addHeader(data);
 
-    // Header
-    builder.doc.setFontSize(FONT_SIZE_NORMAL);
-    builder.doc.setLineWidth(0.5);
-    builder.doc.rect(MARGIN, builder.cursor, CONTENT_WIDTH, 10);
-    builder.doc.text(`Patient: ${data.nom_prenom || 'N/A'}`, MARGIN + 2, builder.cursor + 6);
-    builder.doc.text(`Date CEC: ${formatDate(data.date_cec)}`, MARGIN + 80, builder.cursor + 6);
-    builder.doc.text(`N° CEC: ${data.numero_cec || 'N/A'}`, MARGIN + 140, builder.cursor + 6);
-    builder.cursor += 15;
+    renderDocumentContent(builder, data);
 
-    builder.addSectionTitle('Informations Patient');
-    builder.addKeyValueTable([
-        [{ label: 'Matricule', value: formatValue(data.matricule) }],
-        [{ label: 'CH', value: formatValue(data.ch) }],
-        [{ label: 'Date de Naissance', value: formatDate(data.date_naissance) }],
-        [{ label: 'Âge', value: formatValue(data.age, 'ans') }],
-        [{ label: 'Sexe', value: formatValue(data.sexe) }],
-        [{ label: 'Poids', value: formatValue(data.poids, 'kg') }],
-        [{ label: 'Taille', value: formatValue(data.taille, 'cm') }],
-        [{ label: 'S. Corporelle', value: formatValue(data.surface_corporelle, 'm²') }],
-        [{ label: 'Débit Théorique', value: formatValue(data.debit_theorique, 'L/min') }],
-    ]);
-    builder.addText(data.diagnostic || '', 'Diagnostic');
-    builder.addText(data.intervention || '', 'Intervention');
-    
-    builder.addSectionTitle('Équipe Médicale');
-    builder.addKeyValueTable([
-        [{ label: 'Opérateur', value: formatValue(data.operateur) }],
-        [{ label: 'Aide Op.', value: formatValue(data.aide_op) }],
-        [{ label: 'Instrumentiste', value: formatValue(data.instrumentiste) }],
-        [{ label: 'Perfusionniste', value: formatValue(data.perfusionniste) }],
-        [{ label: 'Anesthésiste', value: formatValue(data.anesthesiste) }],
-        [{ label: 'Technicien Anesthésie', value: formatValue(data.technicien_anesthesie) }],
-    ]);
-
-    builder.addSectionTitle('Données Préopératoires');
-    builder.addKeyValueTable([
-        [{ label: 'GS', value: formatValue(data.gs) }],
-        [{ label: 'Hte', value: formatValue(data.hte, '%') }],
-        [{ label: 'Hb', value: formatValue(data.hb, 'g/dL') }],
-        [{ label: 'Na+', value: formatValue(data.na, 'mEq/L') }],
-        [{ label: 'K+', value: formatValue(data.k, 'mEq/L') }],
-        [{ label: 'Créat', value: formatValue(data.creat, 'mg/dL') }],
-        [{ label: 'Protides', value: formatValue(data.protides, 'g/L') }],
-    ]);
-    
-    builder.addSectionTitle('Examens Complémentaires');
-    builder.addText(data.echo_coeur || '', 'Echo Coeur');
-    builder.addText(data.coro || '', 'Coronographie');
-
-    builder.addSectionTitle('Matériel CEC');
-    builder.addKeyValueTable([
-        [{ label: 'Oxygénateur', value: formatValue(data.oxygenateur) }],
-        [{ label: 'Circuit', value: formatValue(data.circuit) }],
-        [{ label: 'Canule Artérielle', value: formatValue(data.canule_art) }],
-        [{ label: 'Canule Veineuse', value: formatValue(data.canule_vein) }],
-        [{ label: 'Canule Cardioplégie', value: formatValue(data.canule_cardio) }],
-        [{ label: 'Canule Décharge', value: formatValue(data.canule_decharge) }],
-        [{ label: 'Kit Hémofiltration', value: formatValue(data.kit_hemo) }],
-    ]);
-    
-    builder.addSectionTitle('Anticoagulation et Drogues');
-     builder.addKeyValueTable([
-        [{ label: 'Héparine Circuit', value: formatValue(data.heparine_circuit, 'UI') }],
-        [{ label: 'Héparine Malade', value: formatValue(data.heparine_malade, 'UI') }],
-        [{ label: 'Héparine Total', value: formatValue(data.heparine_total, 'UI') }],
-    ]);
-    
-    if (data.autres_drogues && data.autres_drogues.length > 0) {
-        builder.addTable(
-            [["Nom", "Dose", "Unité", "Heure"]],
-            data.autres_drogues.map(d => [d.nom, d.dose, d.unite, formatTime(d.heure)])
-        );
-    }
-
-    builder.addSectionTitle('Priming et Remplissage');
-    const primingBody = data.priming?.filter(p => p.initial || p.ajout).map(p => [p.solute, p.initial || '0', p.ajout || '0', (p.initial || 0) + (p.ajout || 0)]) || [];
-    if (primingBody.length > 0) {
-        builder.addTable(
-            [["Soluté", "Initial (ml)", "Ajout (ml)", "Total (ml)"]],
-            primingBody
-        );
-    } else {
-        builder.addText("Aucune donnée de priming.");
-    }
-
-    builder.addSectionTitle('Déroulement de la CEC');
-    const timelineBody = data.timelineEvents?.sort((a,b) => (a.time || "").localeCompare(b.time || "")).map(e => [formatTime(e.time), e.name, e.type]) || [];
-    if(timelineBody.length > 0) {
-       builder.addTable(
-            [["Heure", "Événement", "Type"]],
-            timelineBody,
-            "Journal des Événements"
-        );
-    }
-
-    const cardioBody = data.cardioplegiaDoses?.map(d => [formatTime(d.heure), d.dose, d.minCec, d.temp]) || [];
-     if(cardioBody.length > 0) {
-        builder.addTable(
-            [["Heure", "Dose (ml)", "Min CEC", "T°C"]],
-            cardioBody,
-            `Cardioplégie (${data.type_cardioplegie} ${data.type_cardioplegie === 'autre' ? data.autre_cardioplegie || '' : ''})`
-        );
-    }
-    
-    builder.addSectionTitle('Gaz du Sang');
-    if (data.bloodGases && data.bloodGases.length > 0 && Object.keys(data.bloodGases[0]).length > 1) {
-        const bgHeaders = ['Paramètre', ...(data.bloodGases?.map(bg => bg.time || '') || [])];
-        const bgParams = [
-            { key: 'act', label: 'ACT (sec)' }, { key: 'temperature', label: 'T° (°C)' },
-            { key: 'ht', label: 'Ht (%)' }, { key: 'hb', label: 'Hb (g/dL)' },
-            { key: 'pao2', label: 'Pao2 (mmHg)' }, { key: 'paco2', label: 'Paco2 (mmHg)' },
-            { key: 'ph', label: 'pH' }, { key: 'sat', label: 'Sat (%)' },
-            { key: 'hco3', label: 'HCO3- (mmol/L)' }, { key: 'be', label: 'BE (mmol/L)' },
-            { key: 'k', label: 'K+ (mEq/L)' }, { key: 'na', label: 'Na+ (mEq/L)' },
-            { key: 'ca', label: 'Ca++ (mEq/L)' }, { key: 'lactate', label: 'Lactate (mmol/L)' },
-            { key: 'diurese', label: 'Diurèse (ml)' },
-        ];
-        const bgBody = bgParams.map(param => {
-            const rowData = data.bloodGases?.map(col => formatValue((col as any)[param.key])) || [];
-            return [param.label, ...rowData];
-        });
-        builder.addTable([bgHeaders], bgBody);
-    } else {
-        builder.addText("Aucune donnée de gaz du sang.");
-    }
-    
-    builder.addSectionTitle('Bilan Entrées/Sorties');
-    const entreesData = [
-        { label: 'Apports Anesthésiques', value: formatValue(data.entrees_apports_anesthesiques, 'ml')},
-        { label: 'Priming', value: formatValue(data.entrees_priming, 'ml')},
-        { label: 'Cardioplégie', value: formatValue(data.entrees_cardioplegie, 'ml')},
-        { label: 'Total Entrées', value: formatValue(data.total_entrees, 'ml')},
-    ];
-    const sortiesData = [
-        { label: 'Diurèse', value: formatValue(data.sorties_diurese, 'ml') },
-        { label: 'Hémofiltration', value: formatValue(data.sorties_hemofiltration, 'ml') },
-        { label: 'Aspiration Perdue', value: formatValue(data.sorties_aspiration_perdue, 'ml') },
-        { label: 'Sang Pompe Résiduel', value: formatValue(data.sorties_sang_pompe_residuel, 'ml') },
-        { label: 'Total Sorties', value: formatValue(data.total_sorties, 'ml') },
-    ];
-
-    const balanceBody = [];
-    const maxRows = Math.max(entreesData.length, sortiesData.length);
-    for (let i = 0; i < maxRows; i++) {
-        const entree = entreesData[i];
-        const sortie = sortiesData[i];
-        balanceBody.push([
-            entree ? { content: entree.label, styles: { fontStyle: 'bold' } } : '',
-            entree ? entree.value : '',
-            sortie ? { content: sortie.label, styles: { fontStyle: 'bold' } } : '',
-            sortie ? sortie.value : '',
-        ]);
-    }
-    
-    autoTable(builder.doc, {
-        startY: builder.cursor,
-        head: [['Entrées', '', 'Sorties', '']],
-        body: balanceBody,
-        theme: 'plain',
-        tableWidth: CONTENT_WIDTH,
-        headStyles: { fontStyle: 'bold', halign: 'center', fontSize: 11, fillColor: [240, 240, 240] },
-        columnStyles: {
-            0: { cellWidth: 45 },
-            1: { cellWidth: 45, halign: 'right' },
-            2: { cellWidth: 45 },
-            3: { cellWidth: 45, halign: 'right' },
-        },
-        didDrawPage: (data: any) => {
-            builder.cursor = data.cursor.y + 2;
-        }
-    });
-    builder.cursor = (builder.doc as any).lastAutoTable.finalY + 10;
-    
-    builder.addSectionTitle('Observations');
-    builder.addText(data.observations || 'N/A');
-
-    const filename = `${data.nom_prenom?.replace(/ /g, '_')}_${data.matricule}.pdf`;
+    const filename = `${data.nom_prenom?.replace(/ /g, '_') || 'Patient'}_${formatDate(data.date_cec).replace(/\//g, '-')}.pdf`;
     builder.open(filename);
 }
 
 export async function generatePdfBlob(data: CecFormValues): Promise<Blob> {
     const builder = new DocBuilder();
-    
-    builder.addTitle('Compte Rendu de Circulation Extra-Corporelle');
+    builder.addHeader(data);
 
-    // Header
-    builder.doc.setFontSize(FONT_SIZE_NORMAL);
-    builder.doc.setLineWidth(0.5);
-    builder.doc.rect(MARGIN, builder.cursor, CONTENT_WIDTH, 10);
-    builder.doc.text(`Patient: ${data.nom_prenom || 'N/A'}`, MARGIN + 2, builder.cursor + 6);
-    builder.doc.text(`Date CEC: ${formatDate(data.date_cec)}`, MARGIN + 80, builder.cursor + 6);
-    builder.doc.text(`N° CEC: ${data.numero_cec || 'N/A'}`, MARGIN + 140, builder.cursor + 6);
-    builder.cursor += 15;
+    // Simply duplicate logic? Refactor clearly needed but sticking to the plan pattern
+    // Ideally extract a render method, but for now I'll call a private internal renderer if I could, 
+    // but the previous code duplicated it. 
+    // Let's create a shared render function to avoid duplication.
 
+    // We can't easily change the architecture of imports now, so I will copy the logic in a smart way.
+    // Actually, I can make generatePdf call an internal render(builder, data).
+
+    renderDocumentContent(builder, data);
+
+    return builder.asBlob();
+}
+
+function renderDocumentContent(builder: DocBuilder, data: CecFormValues) {
+    // --- Colonne 1 : Patient ---
     builder.addSectionTitle('Informations Patient');
-    builder.addKeyValueTable([
-        [{ label: 'Matricule', value: formatValue(data.matricule) }],
-        [{ label: 'CH', value: formatValue(data.ch) }],
-        [{ label: 'Date de Naissance', value: formatDate(data.date_naissance) }],
-        [{ label: 'Âge', value: formatValue(data.age, 'ans') }],
-        [{ label: 'Sexe', value: formatValue(data.sexe) }],
-        [{ label: 'Poids', value: formatValue(data.poids, 'kg') }],
-        [{ label: 'Taille', value: formatValue(data.taille, 'cm') }],
-        [{ label: 'S. Corporelle', value: formatValue(data.surface_corporelle, 'm²') }],
-        [{ label: 'Débit Théorique', value: formatValue(data.debit_theorique, 'L/min') }],
-    ]);
-    builder.addText(data.diagnostic || '', 'Diagnostic');
-    builder.addText(data.intervention || '', 'Intervention');
-    
-    builder.addSectionTitle('Équipe Médicale');
-    builder.addKeyValueTable([
-        [{ label: 'Opérateur', value: formatValue(data.operateur) }],
-        [{ label: 'Aide Op.', value: formatValue(data.aide_op) }],
-        [{ label: 'Instrumentiste', value: formatValue(data.instrumentiste) }],
-        [{ label: 'Perfusionniste', value: formatValue(data.perfusionniste) }],
-        [{ label: 'Anesthésiste', value: formatValue(data.anesthesiste) }],
-        [{ label: 'Technicien Anesthésie', value: formatValue(data.technicien_anesthesie) }],
-    ]);
+    builder.addGrid([
+        { label: 'Patient', value: data.nom_prenom || 'N/A' },
+        { label: 'Date Nais.', value: formatDate(data.date_naissance) },
+        { label: 'Matricule', value: formatValue(data.matricule) },
+        { label: 'Âge', value: formatValue(data.age, 'ans') },
+        { label: 'Sexe', value: formatValue(data.sexe) },
+        { label: 'Poids', value: formatValue(data.poids, 'kg') },
+        { label: 'Taille', value: formatValue(data.taille, 'cm') },
+        { label: 'Surface', value: formatValue(data.surface_corporelle, 'm²') },
+        { label: 'Débit', value: formatValue(data.debit_theorique, 'L/min') },
+        { label: 'Groupe', value: formatValue(data.gs) }
+    ], 2);
 
-    builder.addSectionTitle('Données Préopératoires');
-    builder.addKeyValueTable([
-        [{ label: 'GS', value: formatValue(data.gs) }],
-        [{ label: 'Hte', value: formatValue(data.hte, '%') }],
-        [{ label: 'Hb', value: formatValue(data.hb, 'g/dL') }],
-        [{ label: 'Na+', value: formatValue(data.na, 'mEq/L') }],
-        [{ label: 'K+', value: formatValue(data.k, 'mEq/L') }],
-        [{ label: 'Créat', value: formatValue(data.creat, 'mg/dL') }],
-        [{ label: 'Protides', value: formatValue(data.protides, 'g/L') }],
-    ]);
-    
-    builder.addSectionTitle('Examens Complémentaires');
-    builder.addText(data.echo_coeur || '', 'Echo Coeur');
-    builder.addText(data.coro || '', 'Coronographie');
+    // --- Diagnostics ---
+    builder.cursor += 5;
+    builder.addGrid([
+        { label: 'Diagnostic', value: data.diagnostic || 'N/A' }
+    ], 1);
+    builder.addGrid([
+        { label: 'Intervention', value: data.intervention || 'N/A' }
+    ], 1);
 
-    builder.addSectionTitle('Matériel CEC');
-    builder.addKeyValueTable([
-        [{ label: 'Oxygénateur', value: formatValue(data.oxygenateur) }],
-        [{ label: 'Circuit', value: formatValue(data.circuit) }],
-        [{ label: 'Canule Artérielle', value: formatValue(data.canule_art) }],
-        [{ label: 'Canule Veineuse', value: formatValue(data.canule_vein) }],
-        [{ label: 'Canule Cardioplégie', value: formatValue(data.canule_cardio) }],
-        [{ label: 'Canule Décharge', value: formatValue(data.canule_decharge) }],
-        [{ label: 'Kit Hémofiltration', value: formatValue(data.kit_hemo) }],
-    ]);
-    
-    builder.addSectionTitle('Anticoagulation et Drogues');
-     builder.addKeyValueTable([
-        [{ label: 'Héparine Circuit', value: formatValue(data.heparine_circuit, 'UI') }],
-        [{ label: 'Héparine Malade', value: formatValue(data.heparine_malade, 'UI') }],
-        [{ label: 'Héparine Total', value: formatValue(data.heparine_total, 'UI') }],
-    ]);
-    
-    if (data.autres_drogues && data.autres_drogues.length > 0) {
-        builder.addTable(
-            [["Nom", "Dose", "Unité", "Heure"]],
-            data.autres_drogues.map(d => [d.nom, d.dose, d.unite, formatTime(d.heure)])
-        );
-    }
 
-    builder.addSectionTitle('Priming et Remplissage');
-    const primingBody = data.priming?.filter(p => p.initial || p.ajout).map(p => [p.solute, p.initial || '0', p.ajout || '0', (p.initial || 0) + (p.ajout || 0)]) || [];
+    // --- Equipe ---
+    builder.addSectionTitle('Équipe Activité');
+    builder.addGrid([
+        { label: 'Opérateur', value: formatValue(data.operateur) },
+        { label: 'Perfusionniste', value: formatValue(data.perfusionniste) },
+        { label: 'Aide Op.', value: formatValue(data.aide_op) },
+        { label: 'Anesthésiste', value: formatValue(data.anesthesiste) },
+        { label: 'Instrumentiste', value: formatValue(data.instrumentiste) },
+        { label: 'Tech. Anesth.', value: formatValue(data.technicien_anesthesie) },
+    ], 2);
+
+    // --- Biologie ---
+    builder.addSectionTitle('Biologie Pré-op');
+    builder.addGrid([
+        { label: 'Hte', value: formatValue(data.hte, '%') },
+        { label: 'Hb', value: formatValue(data.hb, 'g/dL') },
+        { label: 'Na+', value: formatValue(data.na, 'mEq/L') },
+        { label: 'K+', value: formatValue(data.k, 'mEq/L') },
+        { label: 'Créat', value: formatValue(data.creat, 'mg/dL') },
+        { label: 'Protides', value: formatValue(data.protides, 'g/L') }
+    ], 3);
+
+    // --- Materiel & Anticoag ---
+    builder.addSectionTitle('Configuration CEC');
+    builder.addGrid([
+        { label: 'Oxygénateur', value: formatValue(data.oxygenateur) },
+        { label: 'Hép. Circuit', value: formatValue(data.heparine_circuit, 'UI') },
+        { label: 'Circuit', value: formatValue(data.circuit) },
+        { label: 'Hép. Malade', value: formatValue(data.heparine_malade, 'UI') },
+        { label: 'Kit Hémo.', value: formatValue(data.kit_hemo) },
+        { label: 'Hép. Total', value: formatValue(data.heparine_total, 'UI') },
+    ], 2);
+
+    // Cannulation sub-section? Just add to grid
+    builder.cursor += 5;
+    builder.addGrid([
+        { label: 'Canule Art.', value: formatValue(data.canule_art) },
+        { label: 'Canule V. 1', value: formatValue(data.canule_vein) },
+        { label: 'Cardioplégie', value: formatValue(data.canule_cardio) },
+        { label: 'Canule V. 2', value: formatValue(data.canule_vein_2) },
+        { label: 'Décharge', value: formatValue(data.canule_decharge) },
+    ], 2);
+
+
+    // --- Priming Table ---
+    // If we have priming data
+    const primingBody = data.priming?.filter(p => p.initial || p.ajout).map(p => [p.solute, p.initial || '0', p.ajout || '0', formatValue((p.initial || 0) + (p.ajout || 0))]) || [];
     if (primingBody.length > 0) {
         builder.addTable(
             [["Soluté", "Initial (ml)", "Ajout (ml)", "Total (ml)"]],
-            primingBody
+            primingBody,
+            "Priming & Remplissage"
         );
-    } else {
-        builder.addText("Aucune donnée de priming.");
     }
 
-    builder.addSectionTitle('Déroulement de la CEC');
-    const timelineBody = data.timelineEvents?.sort((a,b) => (a.time || "").localeCompare(b.time || "")).map(e => [formatTime(e.time), e.name, e.type]) || [];
-    if(timelineBody.length > 0) {
-       builder.addTable(
+    // --- Timeline ---
+    const timelineBody = data.timelineEvents?.sort((a, b) => (a.time || "").localeCompare(b.time || "")).map(e => [formatTime(e.time), e.name, e.type]) || [];
+    if (timelineBody.length > 0) {
+        builder.addTable(
             [["Heure", "Événement", "Type"]],
             timelineBody,
-            "Journal des Événements"
+            "Chronologie"
         );
     }
 
+    // --- Cardioplegia ---
     const cardioBody = data.cardioplegiaDoses?.map(d => [formatTime(d.heure), d.dose, d.minCec, d.temp]) || [];
-     if(cardioBody.length > 0) {
+    if (cardioBody.length > 0) {
         builder.addTable(
             [["Heure", "Dose (ml)", "Min CEC", "T°C"]],
             cardioBody,
-            `Cardioplégie (${data.type_cardioplegie} ${data.type_cardioplegie === 'autre' ? data.autre_cardioplegie || '' : ''})`
+            `Cardioplégie (${data.type_cardioplegie === 'autre' ? data.autre_cardioplegie || 'Autre' : data.type_cardioplegie})`
         );
     }
-    
-    builder.addSectionTitle('Gaz du Sang');
+
+    // --- Gaz du Sang ---
     if (data.bloodGases && data.bloodGases.length > 0 && Object.keys(data.bloodGases[0]).length > 1) {
+        // Transpose data for table
         const bgHeaders = ['Paramètre', ...(data.bloodGases?.map(bg => bg.time || '') || [])];
         const bgParams = [
-            { key: 'act', label: 'ACT (sec)' }, { key: 'temperature', label: 'T° (°C)' },
-            { key: 'ht', label: 'Ht (%)' }, { key: 'hb', label: 'Hb (g/dL)' },
-            { key: 'pao2', label: 'Pao2 (mmHg)' }, { key: 'paco2', label: 'Paco2 (mmHg)' },
-            { key: 'ph', label: 'pH' }, { key: 'sat', label: 'Sat (%)' },
-            { key: 'hco3', label: 'HCO3- (mmol/L)' }, { key: 'be', label: 'BE (mmol/L)' },
-            { key: 'k', label: 'K+ (mEq/L)' }, { key: 'na', label: 'Na+ (mEq/L)' },
-            { key: 'ca', label: 'Ca++ (mEq/L)' }, { key: 'lactate', label: 'Lactate (mmol/L)' },
-            { key: 'diurese', label: 'Diurèse (ml)' },
+            { key: 'ph', label: 'pH' }, { key: 'pao2', label: 'PaO2' }, { key: 'paco2', label: 'PaCO2' }, { key: 'sat', label: 'Sat%' },
+            { key: 'hb', label: 'Hb' }, { key: 'ht', label: 'Ht' }, { key: 'act', label: 'ACT' },
+            { key: 'k', label: 'K+' }, { key: 'na', label: 'Na+' }, { key: 'ca', label: 'Ca++' }, { key: 'lactate', label: 'Lac' },
+            { key: 'temperature', label: 'T°C' }
         ];
+
         const bgBody = bgParams.map(param => {
             const rowData = data.bloodGases?.map(col => formatValue((col as any)[param.key])) || [];
             return [param.label, ...rowData];
         });
-        builder.addTable([bgHeaders], bgBody);
-    } else {
-        builder.addText("Aucune donnée de gaz du sang.");
+
+        builder.addTable([bgHeaders], bgBody, 'Gaz du Sang');
     }
-    
-    builder.addSectionTitle('Bilan Entrées/Sorties');
-    const entreesData = [
-        { label: 'Apports Anesthésiques', value: formatValue(data.entrees_apports_anesthesiques, 'ml')},
-        { label: 'Priming', value: formatValue(data.entrees_priming, 'ml')},
-        { label: 'Cardioplégie', value: formatValue(data.entrees_cardioplegie, 'ml')},
-        { label: 'Total Entrées', value: formatValue(data.total_entrees, 'ml')},
-    ];
-    const sortiesData = [
-        { label: 'Diurèse', value: formatValue(data.sorties_diurese, 'ml') },
-        { label: 'Hémofiltration', value: formatValue(data.sorties_hemofiltration, 'ml') },
-        { label: 'Aspiration Perdue', value: formatValue(data.sorties_aspiration_perdue, 'ml') },
-        { label: 'Sang Pompe Résiduel', value: formatValue(data.sorties_sang_pompe_residuel, 'ml') },
-        { label: 'Total Sorties', value: formatValue(data.total_sorties, 'ml') },
+
+    // --- Bilan ---
+    // Custom formatted table for Bilan
+    const totalEntrees = data.total_entrees || 0;
+    const totalSorties = data.total_sorties || 0;
+    const balance = totalEntrees - totalSorties;
+
+    const bilans = [
+        ['Apports Anesth.', formatValue(data.entrees_apports_anesthesiques, 'ml'), { content: 'Diurèse', styles: { fontStyle: 'bold', textColor: COLORS.primary } }, formatValue(data.sorties_diurese, 'ml')],
+        ['Priming', formatValue(data.entrees_priming, 'ml'), { content: 'Hémofiltration', styles: { fontStyle: 'bold', textColor: COLORS.primary } }, formatValue(data.sorties_hemofiltration, 'ml')],
+        ['Cardioplégie', formatValue(data.entrees_cardioplegie, 'ml'), { content: 'Aspiration', styles: { fontStyle: 'bold', textColor: COLORS.primary } }, formatValue(data.sorties_aspiration_perdue, 'ml')],
+        ['', '', { content: 'Sang Pompe', styles: { fontStyle: 'bold', textColor: COLORS.primary } }, formatValue(data.sorties_sang_pompe_residuel, 'ml')],
+        [{ content: 'Total Entrées', styles: { fontStyle: 'bold', textColor: COLORS.primary } },
+        { content: formatValue(totalEntrees, 'ml'), styles: { fontStyle: 'bold' } },
+        { content: 'Total Sorties', styles: { fontStyle: 'bold', textColor: COLORS.primary } },
+        { content: formatValue(totalSorties, 'ml'), styles: { fontStyle: 'bold' } }]
     ];
 
-    const balanceBody = [];
-    const maxRows = Math.max(entreesData.length, sortiesData.length);
-    for (let i = 0; i < maxRows; i++) {
-        const entree = entreesData[i];
-        const sortie = sortiesData[i];
-        balanceBody.push([
-            entree ? { content: entree.label, styles: { fontStyle: 'bold' } } : '',
-            entree ? entree.value : '',
-            sortie ? { content: sortie.label, styles: { fontStyle: 'bold' } } : '',
-            sortie ? sortie.value : '',
-        ]);
-    }
-    
-    autoTable(builder.doc, {
-        startY: builder.cursor,
-        head: [['Entrées', '', 'Sorties', '']],
-        body: balanceBody,
-        theme: 'plain',
-        tableWidth: CONTENT_WIDTH,
-        headStyles: { fontStyle: 'bold', halign: 'center', fontSize: 11, fillColor: [240, 240, 240] },
-        columnStyles: {
-            0: { cellWidth: 45 },
-            1: { cellWidth: 45, halign: 'right' },
-            2: { cellWidth: 45 },
-            3: { cellWidth: 45, halign: 'right' },
-        },
-        didDrawPage: (data: any) => {
-            builder.cursor = data.cursor.y + 2;
-        }
-    });
-    builder.cursor = (builder.doc as any).lastAutoTable.finalY + 10;
-    
+    builder.addTable(
+        [['Entrées', '', 'Sorties', '']],
+        bilans,
+        `Bilan (Balance: ${balance > 0 ? '+' : ''}${balance} ml)`
+    );
+
+    // --- Observations ---
     builder.addSectionTitle('Observations');
-    builder.addText(data.observations || 'N/A');
-    
-    return builder.asBlob();
+    builder.addGrid(
+        [
+            { label: 'Observations: ', value: formatValue(data.observations || 'Aucune observation particulière.') },
+        ]
+    );
 }
 

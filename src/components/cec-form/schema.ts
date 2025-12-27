@@ -2,8 +2,8 @@
 import { z } from 'zod';
 
 const nullableNumber = z.preprocess(
-  (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
-  z.number().optional().nullable()
+    (val) => (val === "" || val === null || val === undefined ? undefined : Number(val)),
+    z.number().optional().nullable()
 );
 
 export const primingSolutes = [
@@ -17,12 +17,38 @@ export const primingSolutes = [
     'Autre'
 ];
 
-export type UtilityCategory = 
-    'interventions' | 
-    'chirurgiens' | 
-    'anesthesistes' | 
-    'personnel' | 
-    'techniciens-anesthesie' | 
+export type PrimingCategory = 'cristalloide' | 'colloide' | 'produit_sanguin' | 'autre';
+
+export function getPrimingCategory(solute: string): PrimingCategory {
+    const lowerSolute = solute.toLowerCase();
+
+    // Colloïdes (Check BEFORE Blood Products to catch Plasmagel which contains 'plasma')
+    if (lowerSolute.includes('plasmagel') || lowerSolute.includes('voluven') ||
+        lowerSolute.includes('albumine') || lowerSolute.includes('mannitol')) {
+        return 'colloide';
+    }
+
+    // Produits Sanguins
+    if (lowerSolute.includes('plasma') || lowerSolute.includes('pfc') ||
+        lowerSolute.includes('globulaire') || lowerSolute.includes('sang') || lowerSolute.includes('cg')) {
+        return 'produit_sanguin';
+    }
+
+    // Cristalloïdes
+    if (lowerSolute.includes('ringer') || lowerSolute.includes('phy') ||
+        lowerSolute.includes('nacl') || lowerSolute.includes('iso') || lowerSolute.includes('rl')) {
+        return 'cristalloide';
+    }
+
+    return 'autre';
+}
+
+export type UtilityCategory =
+    'interventions' |
+    'chirurgiens' |
+    'anesthesistes' |
+    'personnel' |
+    'techniciens-anesthesie' |
     'drogues' |
     'oxygenateur' |
     'circuit' |
@@ -124,8 +150,8 @@ export const cecFormSchema = z.object({
     date_naissance: z.string().optional(),
     age: nullableNumber,
     sexe: z.enum(['homme', 'femme']).optional(),
-    poids: z.coerce.number({invalid_type_error: "Le poids doit être un nombre."}).positive("Le poids doit être positif.").optional(),
-    taille: z.coerce.number({invalid_type_error: "La taille doit être un nombre."}).positive("La taille doit être positive.").optional(),
+    poids: z.coerce.number({ invalid_type_error: "Le poids doit être un nombre." }).positive("Le poids doit être positif.").optional(),
+    taille: z.coerce.number({ invalid_type_error: "La taille doit être un nombre." }).positive("La taille doit être positive.").optional(),
     surface_corporelle: nullableNumber,
     debit_theorique: nullableNumber,
     origine: z.string().optional(),
@@ -149,7 +175,7 @@ export const cecFormSchema = z.object({
     k: z.string().optional(),
     creat: z.string().optional(),
     protides: z.string().optional(),
-    
+
     // Examens complémentaires
     echo_coeur: z.string().optional(),
     coro: z.string().optional(),
@@ -206,7 +232,7 @@ export const cecFormSchema = z.object({
     sorties_sang_pompe_residuel: nullableNumber,
     total_entrees: nullableNumber.optional(),
     total_sorties: nullableNumber.optional(),
-    
+
     // Observations
     observations: z.string().optional(),
 
@@ -219,6 +245,6 @@ export const cecFormSchema = z.object({
 
 export type CecFormValues = z.infer<typeof cecFormSchema>;
 
-    
 
-    
+
+

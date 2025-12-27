@@ -3,18 +3,13 @@
 import * as React from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { parse, isValid } from "date-fns";
+import { format, parse, isValid, differenceInMinutes } from "date-fns";
 import { cecFormSchema, type CecFormValues, primingSolutes, type PrimingRow, type CardioplegiaDose } from "./schema";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "../ui/button";
-import { Activity, Users, FileText, Printer, Save, Syringe, TestTube, Loader2, Share2, Brain } from "lucide-react";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, Users, FileText, Printer, Save, Syringe, TestTube, Loader2, Share2, Brain, CheckCircle2, ShieldAlert, Wand2, AlertCircle, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { PatientInfo } from "./patient-info";
 import { TeamInfo } from "./team-info";
@@ -23,6 +18,9 @@ import { DeroulementTab } from "./deroulement-tab";
 import { BilanTab } from "./bilan-tab";
 import { PreOpBilan } from "./pre-op-bilan";
 import { ExamensComplementaires } from "./examens-complementaires";
+import { ClinicalDetails } from "./clinical-details";
+import { Sidebar } from "./sidebar";
+import { ClipboardList } from "lucide-react";
 import { saveCecForm } from "@/services/cec";
 import { testData } from './test-data';
 import { generatePdf, generatePdfBlob } from "./pdf-generator";
@@ -30,6 +28,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toDataURL } from 'qrcode';
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { aiPredictionService } from "@/services/ai-prediction";
+import { validateReport, generateObservations } from "@/app/actions/knowledge";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +47,10 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
   const [shareableLink, setShareableLink] = React.useState('');
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [aiRisk, setAiRisk] = React.useState<number | null>(null);
+  const [activeStep, setActiveStep] = React.useState(0);
+  const [aiAlerts, setAiAlerts] = React.useState<any[]>([]);
+  const [isValidating, setIsValidating] = React.useState(false);
+  const [isSummarizing, setIsSummarizing] = React.useState(false);
 
   const form = useForm<CecFormValues>({
     resolver: zodResolver(cecFormSchema),
@@ -167,6 +170,43 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
     }
   }, [poids, taille, setValue]);
 
+  // Draft Auto-save Logic
+  React.useEffect(() => {
+    if (isReadOnly || initialData?.id) return;
+
+    const draftKey = `cec_draft_${user?.username || 'guest'}`;
+    const timer = setTimeout(() => {
+      const data = getValues();
+      localStorage.setItem(draftKey, JSON.stringify(data));
+      // Notify other components in the same tab
+      window.dispatchEvent(new CustomEvent('cec-draft-updated', { detail: data }));
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [watch(), user?.username, isReadOnly]);
+
+  // Load Draft
+  React.useEffect(() => {
+    if (isReadOnly || initialData?.id) return;
+    const draftKey = `cec_draft_${user?.username || 'guest'}`;
+    const savedDraft = localStorage.getItem(draftKey);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        // Ask user if they want to restore? For now, we auto-load if form is empty
+        if (!getValues('nom_prenom')) {
+          reset(parsed);
+          toast({
+            title: "Brouillon récupéré",
+            description: "Votre saisie précédente a été restaurée automatiquement.",
+          });
+        }
+      } catch (e) {
+        console.error("Failed to parse draft", e);
+      }
+    }
+  }, []);
+
   React.useEffect(() => {
     if (dateNaissance) {
       // Handles both 'yyyy-MM-dd' and 'dd/MM/yyyy'
@@ -211,6 +251,39 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
     setValue('entrees_cardioplegie', total > 0 ? total : undefined, { shouldDirty: true, shouldValidate: true });
   }, [cardioplegiaDoses, setValue]);
 
+  const timelineEvents = watch("timelineEvents") || [];
+  React.useEffect(() => {
+    if (!timelineEvents.length) return;
+
+    const findTime = (type: string) => {
+      const event = timelineEvents.find(e => e.type === type);
+      if (!event?.time) return null;
+      return parse(event.time, 'HH:mm', new Date());
+    };
+
+    const departCec = findTime('Départ CEC');
+    const finCec = findTime('Fin CEC');
+    const clampage = findTime('Clampage');
+    const declampage = findTime('Déclampage');
+
+    if (departCec && finCec && isValid(departCec) && isValid(finCec)) {
+      const diff = differenceInMinutes(finCec, departCec);
+      // Handle mid-night crossing if needed? (optional, usually cases don't cross midnight in a way HH:mm break)
+      setValue('duree_cec', Math.max(0, diff).toString(), { shouldDirty: true });
+    }
+
+    if (clampage && declampage && isValid(clampage) && isValid(declampage)) {
+      const diff = differenceInMinutes(declampage, clampage);
+      setValue('duree_clampage', Math.max(0, diff).toString(), { shouldDirty: true });
+    }
+
+    // Calculate assistance duration (Déclampage to Fin CEC)
+    if (declampage && finCec && isValid(declampage) && isValid(finCec)) {
+      const diff = differenceInMinutes(finCec, declampage);
+      setValue('duree_assistance', Math.max(0, diff).toString(), { shouldDirty: true });
+    }
+  }, [timelineEvents, setValue]);
+
 
   const handleFillWithTestData = () => {
     reset(testData);
@@ -218,6 +291,44 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
       title: "Données de test chargées",
       description: "Le formulaire a été rempli avec les données de démonstration.",
     });
+  };
+
+  const handleAiCheck = async () => {
+    setIsValidating(true);
+    try {
+      const data = getValues();
+      const result = await validateReport(data);
+      if (result.success) {
+        setAiAlerts(result.data.alerts || []);
+        if (result.data.alerts?.length === 0) {
+          toast({ title: "Cohérence validée", description: "L'IA n'a détecté aucune anomalie majeure." });
+        }
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      toast({ title: "Erreur Analyse", description: error.message, variant: "destructive" });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    setIsSummarizing(true);
+    try {
+      const data = getValues();
+      const result = await generateObservations(data);
+      if (result.success) {
+        setValue('observations', result.data, { shouldDirty: true });
+        toast({ title: "Résumé généré", description: "Les observations ont été mises à jour." });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      toast({ title: "Erreur Génération", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   async function onSubmit(data: CecFormValues) {
@@ -229,6 +340,13 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
         lastModifiedByUsername: user?.username,
       };
       const savedId = await saveCecForm(fullData);
+
+      // Clear draft on success
+      const draftKey = `cec_draft_${user?.username || 'guest'}`;
+      localStorage.removeItem(draftKey);
+      // Notify sidebar that draft is cleared
+      window.dispatchEvent(new CustomEvent('cec-draft-updated', { detail: null }));
+
       toast({
         title: "Sauvegarde réussie !",
         description: "Le compte rendu a été enregistré avec succès.",
@@ -237,8 +355,7 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
       if (onFormSave) {
         onFormSave(savedId);
       } else if (savedId && !initialData?.id) {
-        // If a new form is created, update the URL
-        reset({ ...data, id: savedId }); // update form state with new ID
+        reset({ ...data, id: savedId });
         window.history.replaceState(null, '', `/compte-rendu/${savedId}?mode=edit`);
       }
     } catch (error) {
@@ -253,128 +370,179 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
     }
   }
 
+  const steps = [
+    {
+      title: "Patient & Équipe", icon: Users, content: (
+        <fieldset disabled={isReadOnly} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Informations Patient & Détails Cliniques
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-6 pt-6">
+              <PatientInfo />
+              <ClinicalDetails />
+            </CardContent>
+          </Card>
+
+          <TeamInfo />
+        </fieldset>
+      )
+    },
+    {
+      title: "Bilan Pré-op", icon: TestTube, content: (
+        <fieldset disabled={isReadOnly} className="space-y-6">
+          <Card className="border-none shadow-sm bg-muted/30">
+            <CardContent className="space-y-6 pt-6">
+              <PreOpBilan />
+              <ExamensComplementaires />
+            </CardContent>
+          </Card>
+        </fieldset>
+      )
+    },
+    { title: "Matériel", icon: Syringe, content: <MaterielTab isReadOnly={isReadOnly} /> },
+    { title: "Perfusion (Gaz/Hemodyn)", icon: Activity, content: <DeroulementTab isReadOnly={isReadOnly} /> },
+    { title: "Bilan Final", icon: FileText, content: <BilanTab isReadOnly={isReadOnly} /> },
+  ];
+
   return (
     <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 print:hidden" autoComplete="off">
+      <div className="flex flex-col md:flex-row gap-8 items-start">
+        {/* Main Form Content */}
+        <div className="flex-1 w-full space-y-6">
+          {/* Stepper Header */}
+          <div className="bg-card border rounded-2xl p-4 shadow-sm">
+            <div className="flex justify-between items-center mb-6 px-4">
+              {steps.map((step, idx) => {
+                const Icon = step.icon;
+                const isCompleted = idx < activeStep;
+                const isActive = idx === activeStep;
 
-        <Tabs defaultValue="patient-equipe">
-          <TabsList className="h-auto w-full justify-around bg-card">
-            <TabsTrigger value="patient-equipe" className="flex flex-col h-full gap-1 p-3">
-              <Users className="size-5" />
-              <span>Patient & Équipe</span>
-            </TabsTrigger>
-            <TabsTrigger value="materiel" className="flex flex-col h-full gap-1 p-3">
-              <Syringe className="size-5" />
-              <span>Matériel & Drogues</span>
-            </TabsTrigger>
-            <TabsTrigger value="deroulement" className="flex flex-col h-full gap-1 p-3">
-              <Activity className="size-5" />
-              <span>Déroulement CEC</span>
-            </TabsTrigger>
-            <TabsTrigger value="bilan" className="flex flex-col h-full gap-1 p-3">
-              <FileText className="size-5" />
-              <span>Bilan & Observations</span>
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="patient-equipe">
-            <fieldset disabled={isReadOnly} className="space-y-8 py-4">
-              {aiRisk !== null && (
-                <Alert className="bg-blue-50/50 border-blue-200">
-                  <Brain className="h-4 w-4 text-blue-600" />
-                  <AlertTitle className="text-blue-800">Assistant IA en temps réel</AlertTitle>
-                  <AlertDescription className="flex items-center gap-2 mt-2">
-                    <span className="text-blue-900">Risque de transfusion estimé :</span>
-                    <span className={`text-lg font-bold ${aiRisk > 0.5 ? 'text-red-600' : 'text-green-600'}`}>
-                      {(aiRisk * 100).toFixed(1)}%
-                    </span>
-                  </AlertDescription>
-                </Alert>
-              )}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Informations Générales</CardTitle>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-6">
-                  <PatientInfo />
-                  <div className="space-y-8">
-                    <TeamInfo />
-                    <PreOpBilan />
-                    <ExamensComplementaires />
+                return (
+                  <div key={idx} className="flex flex-col items-center gap-2 group cursor-pointer" onClick={() => setActiveStep(idx)}>
+                    <div className={cn(
+                      "h-10 w-10 rounded-full flex items-center justify-center transition-all border-2",
+                      isActive ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110" :
+                        isCompleted ? "bg-emerald-100 border-emerald-500 text-emerald-600" :
+                          "bg-muted border-transparent text-muted-foreground"
+                    )}>
+                      {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                    </div>
+                    <span className={cn(
+                      "text-[10px] uppercase tracking-wider font-bold hidden md:block",
+                      isActive ? "text-primary" : isCompleted ? "text-emerald-600" : "text-muted-foreground"
+                    )}>{step.title}</span>
                   </div>
-                </CardContent>
-              </Card>
-            </fieldset>
-          </TabsContent>
+                );
+              })}
+            </div>
 
-          <TabsContent value="materiel">
-            <MaterielTab isReadOnly={isReadOnly} />
-          </TabsContent>
+            <div className="relative h-2 bg-muted rounded-full overflow-hidden mx-4">
+              <div
+                className="absolute top-0 left-0 h-full bg-primary transition-all duration-500"
+                style={{ width: `${((activeStep + 1) / steps.length) * 100}%` }}
+              />
+            </div>
+          </div>
 
-          <TabsContent value="deroulement">
-            <DeroulementTab isReadOnly={isReadOnly} />
-          </TabsContent>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 print:hidden" autoComplete="off">
+            <div className="min-h-[400px] animate-in fade-in slide-in-from-right-4 duration-500">
+              {steps[activeStep].content}
+            </div>
 
-          <TabsContent value="bilan">
-            <BilanTab isReadOnly={isReadOnly} />
-          </TabsContent>
-        </Tabs>
+            <footer className="flex justify-between items-center bg-card p-6 rounded-2xl border shadow-sm">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={activeStep === 0}
+                  onClick={() => setActiveStep(prev => prev - 1)}
+                  className="rounded-xl"
+                >
+                  Précédent
+                </Button>
+                {!isReadOnly && (
+                  <Button type="button" variant="ghost" onClick={handleFillWithTestData} className="hidden sm:flex">
+                    <TestTube className="mr-2 h-4 w-4" /> Test JSON
+                  </Button>
+                )}
+              </div>
 
-        <footer className="flex flex-wrap justify-end items-center gap-4 py-8 border-t">
-          {!isReadOnly && (
-            <>
-              <Button type="button" variant="ghost" onClick={handleFillWithTestData}>
-                <TestTube className="mr-2" />Remplir pour Test
-              </Button>
-            </>
-          )}
-          <Button type="button" variant="secondary" onClick={handleGeneratePdf} disabled={isPrinting}>
-            {isPrinting ? <Loader2 className="mr-2 animate-spin" /> : <Printer className="mr-2" />}
-            PDF
-          </Button>
-          <Button type="button" variant="secondary" onClick={handleShare} disabled={isSharing}>
-            {isSharing ? <Loader2 className="mr-2 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
-            Partager
-          </Button>
-
-          {!isReadOnly && (
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2" />
-              )}
-              Enregistrer
-            </Button>
-          )}
-        </footer>
-        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Partager le Compte Rendu</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col items-center justify-center p-4">
-              {qrCodeUrl && <img src={qrCodeUrl} alt="QR Code" />}
-              <p className="mt-4 text-sm text-muted-foreground">Scannez le code QR pour obtenir le lien</p>
-              {shareableLink && (
-                <div className="mt-4 w-full">
-                  <input type="text" readOnly value={shareableLink} className="w-full rounded-md border bg-muted px-3 py-2 text-sm" />
-                  <Button
-                    variant="outline"
-                    className="mt-2 w-full"
-                    onClick={() => {
-                      navigator.clipboard.writeText(shareableLink);
-                      toast({ title: 'Copié', description: 'Le lien a été copié dans le presse-papiers.' });
-                    }}
-                  >
-                    Copier le lien
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1 sm:gap-2 mr-2">
+                  <Button type="button" variant="secondary" size="icon" onClick={handleGeneratePdf} disabled={isPrinting} className="rounded-xl sm:w-auto sm:px-4">
+                    {isPrinting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4 sm:mr-2" />}
+                    <span className="hidden sm:inline">Exporter PDF</span>
+                  </Button>
+                  <Button type="button" variant="secondary" size="icon" onClick={handleShare} disabled={isSharing} className="rounded-xl sm:w-auto sm:px-4">
+                    {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4 sm:mr-2" />}
+                    <span className="hidden sm:inline">Partager</span>
                   </Button>
                 </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      </form>
+
+                {activeStep < steps.length - 1 ? (
+                  <Button
+                    type="button"
+                    onClick={() => setActiveStep(prev => prev + 1)}
+                    className="rounded-xl px-8 shadow-lg shadow-primary/20"
+                  >
+                    Suivant
+                  </Button>
+                ) : (
+                  !isReadOnly && (
+                    <Button type="submit" disabled={isSubmitting} className="rounded-xl px-8 bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-200">
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      Finaliser
+                    </Button>
+                  )
+                )}
+              </div>
+            </footer>
+          </form>
+        </div>
+
+        {/* Real-time Monitoring Sidebar (New Revolutionized Version) */}
+        <Sidebar
+          watch={watch}
+          activeStep={activeStep}
+          aiRisk={aiRisk}
+          isValidating={isValidating}
+          isSummarizing={isSummarizing}
+          aiAlerts={aiAlerts}
+          onAiCheck={handleAiCheck}
+          onGenerateSummary={handleGenerateSummary}
+          isDirty={isDirty}
+        />
+      </div>
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Partager le Compte Rendu</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center justify-center p-4">
+            {qrCodeUrl && <img src={qrCodeUrl} alt="QR Code" />}
+            <p className="mt-4 text-sm text-muted-foreground">Scannez le code QR pour obtenir le lien</p>
+            {shareableLink && (
+              <div className="mt-4 w-full">
+                <input type="text" readOnly value={shareableLink} className="w-full rounded-md border bg-muted px-3 py-2 text-sm" />
+                <Button
+                  variant="outline"
+                  className="mt-2 w-full"
+                  onClick={() => {
+                    navigator.clipboard.writeText(shareableLink);
+                    toast({ title: 'Copié', description: 'Le lien a été copié dans le presse-papiers.' });
+                  }}
+                >
+                  Copier le lien
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </FormProvider>
   );
 }

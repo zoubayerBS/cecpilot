@@ -70,7 +70,7 @@ export function ClinicalAssistantFloating() {
     ];
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+        <div className="fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-4">
             {/* Chat Window */}
             {isOpen && (
                 <Card className="w-[380px] h-[550px] flex flex-col shadow-2xl border-border/40 animate-in slide-in-from-bottom-5 duration-300 rounded-3xl overflow-hidden bg-background/95 backdrop-blur-xl">
