@@ -137,8 +137,66 @@ const hemodynamicMeasureSchema = z.object({
 
 export type HemodynamicMeasure = z.infer<typeof hemodynamicMeasureSchema>;
 
+// Pre-CEC Checklist Schema
+export const checklistPreCecSchema = z.object({
+    // Vérifications Patient
+    identiteVerifiee: z.boolean().default(false),
+    consentementSigne: z.boolean().default(false),
+    dossierComplet: z.boolean().default(false),
+    allergiesVerifiees: z.boolean().default(false),
+    groupeSanguinConfirme: z.boolean().default(false),
+
+    // Vérifications Matériel
+    oxygenateurVerifie: z.boolean().default(false),
+    circuitVerifie: z.boolean().default(false),
+    canulesDisponibles: z.boolean().default(false),
+    reservoirCardioplegie: z.boolean().default(false),
+    pompesTestees: z.boolean().default(false),
+    hemofiltrationPrete: z.boolean().default(false),
+
+    // Vérifications Médicaments
+    heparineDisponible: z.boolean().default(false),
+    protamineDisponible: z.boolean().default(false),
+    primingPrepare: z.boolean().default(false),
+    cardioplegiePrepare: z.boolean().default(false),
+    medicamentsUrgence: z.boolean().default(false),
+
+    // Vérifications Équipement
+    defibrillateurOk: z.boolean().default(false),
+    aspirateurOk: z.boolean().default(false),
+    monitoringConnecte: z.boolean().default(false),
+    analyseurCalibre: z.boolean().default(false),
+    systemeThermiqueTeste: z.boolean().default(false),
+    alarmesTestees: z.boolean().default(false),
+
+    // Vérifications Équipe
+    chirurgienPresent: z.boolean().default(false),
+    anesthesistePresent: z.boolean().default(false),
+    perfusionnistePresent: z.boolean().default(false),
+    instrumentistePresent: z.boolean().default(false),
+    briefingEffectue: z.boolean().default(false),
+
+    // Vérifications Environnement
+    salleOpPrete: z.boolean().default(false),
+    temperatureOk: z.boolean().default(false),
+    eclairageOk: z.boolean().default(false),
+    accesUrgenceDegages: z.boolean().default(false),
+    banqueSangContactee: z.boolean().default(false),
+
+    // Métadonnées
+    completedAt: z.string().optional(),
+    completedBy: z.string().optional(),
+    notes: z.string().optional(),
+});
+
+export type ChecklistPreCec = z.infer<typeof checklistPreCecSchema>;
+
 export const cecFormSchema = z.object({
     id: z.string().optional(), // To track existing documents
+
+    // Pre-CEC Checklist
+    checklistPreCec: checklistPreCecSchema.optional(),
+
     // Header
     numero_cec: z.string().optional(),
     date_cec: z.string({ required_error: "La date est requise." }),

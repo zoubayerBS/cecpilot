@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { PlusCircle, FileText, Eye, Pencil, Stethoscope, Search, Calendar as CalendarIcon, X, Trash2, Activity, Clock, Users, BrainCircuit, Droplets, ShieldAlert, Bot } from 'lucide-react';
+import { PlusCircle, FileText, Eye, Pencil, Stethoscope, Search, Calendar as CalendarIcon, X, Trash2, Activity, Clock, Users, BrainCircuit, Droplets, ShieldAlert, Bot, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -33,6 +33,7 @@ import { DashboardAiInsights } from '@/components/dashboard/ai-insights';
 import { PriorityFiles } from '@/components/dashboard/priority-files';
 import { Badge } from '@/components/ui/badge';
 import { DashboardExport } from '@/components/dashboard/export-actions';
+import { PageHeader } from '@/components/ui/page-header';
 
 
 export default function Home() {
@@ -182,13 +183,12 @@ export default function Home() {
   };
 
   const pageHeader = (
-    <div className="bg-card shadow-sm -mt-4">
-      <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Tableau de bord </h1>
-        </div>
-      </div>
-    </div>
+    <PageHeader
+      title="Tableau de bord"
+      description="Vue d'ensemble de vos interventions et statistiques CEC"
+      icon={LayoutDashboard}
+      gradient="from-blue-50 via-indigo-50/50 to-background dark:from-slate-900 dark:via-slate-900/50 dark:to-background"
+    />
   );
 
 

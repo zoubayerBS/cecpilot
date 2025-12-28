@@ -7,7 +7,7 @@ import { format, parse, isValid, differenceInMinutes } from "date-fns";
 import { cecFormSchema, type CecFormValues, primingSolutes, type PrimingRow, type CardioplegiaDose } from "./schema";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "../ui/button";
-import { Activity, Users, FileText, Printer, Save, Syringe, TestTube, Loader2, Share2, Brain, CheckCircle2, ShieldAlert, Wand2, AlertCircle, Info } from "lucide-react";
+import { Activity, Users, FileText, Printer, Save, Syringe, TestTube, Loader2, Share2, Brain, CheckCircle2, ShieldAlert, Wand2, AlertCircle, Info, RotateCcw, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -21,6 +21,7 @@ import { ExamensComplementaires } from "./examens-complementaires";
 import { ClinicalDetails } from "./clinical-details";
 import { Sidebar } from "./sidebar";
 import { ClipboardList } from "lucide-react";
+import { ChecklistTab } from "./checklist-tab";
 import { saveCecForm } from "@/services/cec";
 import { testData } from './test-data';
 import { generatePdf, generatePdfBlob } from "./pdf-generator";
@@ -35,6 +36,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 
 export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpdate }: { initialData?: CecFormValues; isReadOnly?: boolean; onFormSave?: (id: string) => void; onRiskUpdate?: (risk: number | null) => void }) {
@@ -51,22 +62,113 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
   const [aiAlerts, setAiAlerts] = React.useState<any[]>([]);
   const [isValidating, setIsValidating] = React.useState(false);
   const [isSummarizing, setIsSummarizing] = React.useState(false);
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = React.useState(false);
+
+  const EMPTY_DEFAULTS = {
+    date_cec: new Date().toISOString().substring(0, 10),
+    perfusionniste: user?.username,
+    checklistPreCec: {
+      identiteVerifiee: false,
+      consentementSigne: false,
+      dossierComplet: false,
+      allergiesVerifiees: false,
+      groupeSanguinConfirme: false,
+      oxygenateurVerifie: false,
+      circuitVerifie: false,
+      canulesDisponibles: false,
+      reservoirCardioplegie: false,
+      pompesTestees: false,
+      hemofiltrationPrete: false,
+      heparineDisponible: false,
+      protamineDisponible: false,
+      primingPrepare: false,
+      cardioplegiePrepare: false,
+      medicamentsUrgence: false,
+      defibrillateurOk: false,
+      aspirateurOk: false,
+      monitoringConnecte: false,
+      analyseurCalibre: false,
+      systemeThermiqueTeste: false,
+      alarmesTestees: false,
+      chirurgienPresent: false,
+      anesthesistePresent: false,
+      perfusionnistePresent: false,
+      instrumentistePresent: false,
+      briefingEffectue: false,
+      salleOpPrete: false,
+      temperatureOk: false,
+      eclairageOk: false,
+      accesUrgenceDegages: false,
+      banqueSangContactee: false,
+      notes: "",
+    },
+    nom_prenom: "",
+    matricule: "",
+    date_naissance: "",
+    age: undefined,
+    sexe: undefined,
+    poids: undefined,
+    taille: undefined,
+    surface_corporelle: undefined,
+    debit_theorique: undefined,
+    origine: "",
+    diagnostic: "",
+    intervention: "",
+    operateur: "",
+    aide_op: "",
+    instrumentiste: "",
+    panseur: "",
+    anesthesiste: "",
+    technicien_anesthesie: "",
+    gs: "",
+    hte: "",
+    hb: "",
+    na: "",
+    k: "",
+    creat: "",
+    protides: "",
+    echo_coeur: "",
+    coro: "",
+    oxygenateur: "",
+    circuit: "",
+    canule_art: "",
+    canule_vein: "",
+    canule_vein_2: "",
+    canule_cardio: "",
+    canule_decharge: "",
+    kit_hemo: "",
+    heparine_circuit: undefined,
+    heparine_malade: undefined,
+    heparine_total: undefined,
+    remplacement_valvulaire: undefined,
+    valve_aortique: false,
+    valve_mitrale: false,
+    valve_tricuspide: false,
+    hemodynamicMonitoring: [{}],
+    bloodGases: [{}],
+    autres_drogues: [],
+    cardioplegiaDoses: [],
+    priming: primingSolutes.map(solute => ({ id: solute, solute, initial: undefined, ajout: undefined })),
+    duree_assistance: "",
+    duree_cec: "",
+    duree_clampage: "",
+    diurese_totale: undefined,
+    saignements: undefined,
+    type_cardioplegie: undefined,
+    autre_cardioplegie: "",
+    entrees_apports_anesthesiques: undefined,
+    entrees_priming: undefined,
+    entrees_cardioplegie: undefined,
+    sorties_diurese: undefined,
+    sorties_hemofiltration: undefined,
+    sorties_aspiration_perdue: undefined,
+    sorties_sang_pompe_residuel: undefined,
+    observations: "",
+  };
 
   const form = useForm<CecFormValues>({
     resolver: zodResolver(cecFormSchema),
-    defaultValues: initialData || {
-      date_cec: new Date().toISOString().substring(0, 10),
-      perfusionniste: user?.username,
-      nom_prenom: "",
-      poids: undefined,
-      taille: undefined,
-      surface_corporelle: undefined,
-      hemodynamicMonitoring: [{}],
-      bloodGases: [{}],
-      autres_drogues: [],
-      cardioplegiaDoses: [],
-      priming: primingSolutes.map(solute => ({ id: solute, solute, initial: undefined, ajout: undefined })),
-    },
+    defaultValues: initialData || EMPTY_DEFAULTS,
     mode: "onBlur",
   });
 
@@ -133,8 +235,9 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
   const hte = watch("hte");
   const primingValues = watch("priming");
   const cardioplegiaDoses = watch("cardioplegiaDoses");
+  const bloodGases = watch("bloodGases") || [];
 
-  // AI Prediction Effect
+  // AI Transfusion Prediction Effect
   React.useEffect(() => {
     const hVal = parseFloat(hte || '0');
     // Require weight, height, age, and valid Hct to predict
@@ -372,6 +475,11 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
 
   const steps = [
     {
+      title: "Checklist Pré-CEC",
+      icon: ShieldCheck,
+      content: <ChecklistTab isReadOnly={isReadOnly} />
+    },
+    {
       title: "Patient & Équipe", icon: Users, content: (
         <fieldset disabled={isReadOnly} className="space-y-6">
           <Card>
@@ -465,9 +573,19 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
                   Précédent
                 </Button>
                 {!isReadOnly && (
-                  <Button type="button" variant="ghost" onClick={handleFillWithTestData} className="hidden sm:flex">
-                    <TestTube className="mr-2 h-4 w-4" /> Test JSON
-                  </Button>
+                  <>
+                    <Button type="button" variant="ghost" onClick={handleFillWithTestData} className="hidden sm:flex">
+                      <TestTube className="mr-2 h-4 w-4" /> Test JSON
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="text-slate-600 dark:text-slate-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                      onClick={() => setIsClearConfirmOpen(true)}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" /> Vider
+                    </Button>
+                  </>
                 )}
               </div>
 
@@ -543,6 +661,35 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
           </div>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={isClearConfirmOpen} onOpenChange={setIsClearConfirmOpen}>
+        <AlertDialogContent className="rounded-2xl border-none shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <RotateCcw className="h-5 w-5" />
+              Confirmation de réinitialisation
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600 dark:text-slate-400 py-2">
+              Attention ! Cette action est irréversible. Toutes les données saisies dans le formulaire (équipe médicale, informations patient, gaz du sang, etc.) seront définitivement effacées.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl border-slate-200">Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-lg shadow-red-200"
+              onClick={() => {
+                form.reset(EMPTY_DEFAULTS);
+                setActiveStep(0);
+                toast({
+                  title: "Formulaire vidé",
+                  description: "Toutes les données ont été effacées.",
+                });
+              }}
+            >
+              Vider tout le formulaire
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </FormProvider>
   );
 }

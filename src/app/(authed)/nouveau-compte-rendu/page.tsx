@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CECForm } from '@/components/cec-form';
-import { Brain } from 'lucide-react';
+import { Brain, FileEdit } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from '@/components/ui/page-header';
 
 import { ClinicalAssistantFloating } from '@/components/tools/clinical-assistant-floating';
 
@@ -14,19 +15,19 @@ export default function NewReportPage() {
 
   return (
     <main className="relative min-h-screen">
-      <header className="bg-card shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Nouveau Compte Rendu</h1>
-            {aiRisk !== null && (
-              <Badge variant={aiRisk > 0.5 ? "destructive" : "secondary"} className="gap-1 animate-in fade-in zoom-in">
-                <Brain className="h-3 w-3" />
-                IA: {(aiRisk * 100).toFixed(0)}%
-              </Badge>
-            )}
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        title="Nouveau Compte Rendu"
+        description="Créez un nouveau compte rendu de circulation extracorporelle"
+        icon={FileEdit}
+        gradient="from-emerald-50 via-teal-50/50 to-background dark:from-slate-900 dark:via-slate-900/50 dark:to-background"
+      >
+        {aiRisk !== null && (
+          <Badge variant={aiRisk > 0.5 ? "destructive" : "secondary"} className="gap-1 animate-in fade-in zoom-in">
+            <Brain className="h-3 w-3" />
+            IA: {(aiRisk * 100).toFixed(0)}%
+          </Badge>
+        )}
+      </PageHeader>
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 pb-24">
         <CECForm onFormSave={(id) => router.push(`/`)} onRiskUpdate={setAiRisk} />
       </div>

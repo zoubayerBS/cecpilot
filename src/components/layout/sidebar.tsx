@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
-import { HeartPulse, List, BrainCircuit, LogOut, User, ChevronLeft, Settings, Activity } from "lucide-react"
+import { HeartPulse, Gauge, List, BrainCircuit, LogOut, User, ChevronLeft, Settings, Activity } from "lucide-react"
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ export function Sidebar() {
     {
       title: "Menu Principal",
       links: [
-        { name: 'Tableau de bord', href: '/', icon: List },
+        { name: 'Tableau de bord', href: '/', icon: Gauge },
         { name: 'Nouveau C.R.', href: '/nouveau-compte-rendu', icon: HeartPulse },
       ]
     },

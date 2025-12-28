@@ -60,6 +60,9 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStep, setLoadingStep] = useState('');
   const { login } = useAuth();
   const router = useRouter();
 
@@ -70,9 +73,28 @@ export default function LoginPage() {
 
     try {
       await login(username, password);
+
+      // Start initialization sequence
+      setIsInitializing(true);
+
+      const steps = [
+        { label: 'Chargement du profil utilisateur', duration: 600 },
+        { label: 'Initialisation des modules', duration: 800 },
+        { label: 'Synchronisation des données', duration: 900 },
+        { label: 'Préparation de l\'interface', duration: 700 },
+        { label: 'Finalisation', duration: 500 },
+      ];
+
+      for (let i = 0; i < steps.length; i++) {
+        setLoadingStep(steps[i].label);
+        setLoadingProgress(((i + 1) / steps.length) * 100);
+        await new Promise(resolve => setTimeout(resolve, steps[i].duration));
+      }
+
       router.replace('/');
     } catch (err: any) {
       setError(err.message);
+      setIsInitializing(false);
       // Shake animation trigger
       const form = e.currentTarget as HTMLFormElement;
       form.classList.add('animate-shake');
@@ -99,24 +121,6 @@ export default function LoginPage() {
           <p className="text-xl text-white/90 mb-12 text-center max-w-md font-light">
             Votre Co-Pilote Clinique Intelligent
           </p>
-
-          <div className="grid grid-cols-3 gap-8 w-full max-w-2xl">
-            <div className="text-center space-y-2 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <Activity className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-3xl font-black">2,847</p>
-              <p className="text-sm text-white/80">Interventions</p>
-            </div>
-            <div className="text-center space-y-2 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <Shield className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-3xl font-black">100%</p>
-              <p className="text-sm text-white/80">Sécurisé</p>
-            </div>
-            <div className="text-center space-y-2 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <Zap className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-3xl font-black">24/7</p>
-              <p className="text-sm text-white/80">Disponible</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -227,6 +231,49 @@ export default function LoginPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Fullscreen Loading Overlay */}
+      {isInitializing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-md">
+          <div className="text-center space-y-8 max-w-md px-8">
+            {/* Logo Animation */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full animate-pulse" />
+              <HeartPulse className="h-24 w-24 text-primary mx-auto relative z-10 animate-heartbeat" />
+            </div>
+
+            {/* App Name */}
+            <div>
+              <h2 className="text-3xl font-black mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                CEC Pilot
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Initialisation en cours...
+              </p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-3">
+              <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500 ease-out"
+                  style={{ width: `${loadingProgress}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground animate-pulse">
+                {loadingStep}
+              </p>
+            </div>
+
+            {/* Loading Dots */}
+            <div className="flex justify-center gap-2">
+              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="h-2 w-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

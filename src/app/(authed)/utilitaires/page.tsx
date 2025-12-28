@@ -10,7 +10,8 @@ import { getUtilityList, addUtilityItem, deleteUtilityItem } from '@/services/ut
 import { useToast } from '@/hooks/use-toast';
 import type { UtilityCategory } from '@/components/cec-form/schema';
 import { TensorFlowMonitor } from '@/components/tools/tensorflow-monitor';
-import { BrainCircuit } from 'lucide-react';
+import { BrainCircuit, MonitorCog, Settings } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 
 const utilityCategories: { id: UtilityCategory, name: string, description: string }[] = [
     { id: 'interventions', name: 'Interventions', description: "Gérez la liste des interventions chirurgicales." },
@@ -129,17 +130,12 @@ function UtilityManager({ category, name, description }: { category: UtilityCate
 export default function UtilitiesPage() {
     return (
         <>
-            <header className="bg-card shadow-sm">
-                <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                        <List />
-                        Gestion des Utilitaires
-                    </h1>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                        Gérez les listes déroulantes utilisées dans les formulaires de compte rendu.
-                    </p>
-                </div>
-            </header>
+            <PageHeader
+                title="Gestion des Utilitaires"
+                description="Gérez les listes déroulantes et configurez le système AI TensorFlow.js"
+                icon={Settings}
+                gradient="from-purple-50 via-pink-50/50 to-background dark:from-slate-900 dark:via-slate-900/50 dark:to-background"
+            />
             <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-8">
 
                 <section>

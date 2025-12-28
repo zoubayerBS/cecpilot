@@ -84,21 +84,23 @@ export function LiveMonitorCard({ watch, aiRisk }: LiveMonitorProps) {
 
             {/* AI Risk Bar - Mini Version */}
             {aiRisk !== null && (
-                <div className="mt-5 pt-4 border-t border-dashed border-slate-200 dark:border-slate-700">
-                    <div className="flex justify-between items-end mb-2">
-                        <span className="text-[10px] font-bold uppercase text-slate-400">Risque IA</span>
-                        <span className={cn(
-                            "text-xs font-bold px-2 py-0.5 rounded-full",
-                            aiRisk > 0.5 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"
-                        )}>
-                            {(aiRisk * 100).toFixed(0)}%
-                        </span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                        <div
-                            className={cn("h-full transition-all duration-1000", aiRisk > 0.5 ? "bg-red-500" : "bg-emerald-500")}
-                            style={{ width: `${aiRisk * 100}%` }}
-                        />
+                <div className="mt-5 pt-4 border-t border-dashed border-slate-200 dark:border-slate-700 space-y-4">
+                    <div>
+                        <div className="flex justify-between items-end mb-2">
+                            <span className="text-[10px] font-bold uppercase text-slate-400">Risque Transfusion</span>
+                            <span className={cn(
+                                "text-xs font-bold px-2 py-0.5 rounded-full",
+                                aiRisk > 0.5 ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"
+                            )}>
+                                {(aiRisk * 100).toFixed(0)}%
+                            </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                                className={cn("h-full transition-all duration-1000", aiRisk > 0.5 ? "bg-red-500" : "bg-emerald-500")}
+                                style={{ width: `${aiRisk * 100}%` }}
+                            />
+                        </div>
                     </div>
                 </div>
             )}
