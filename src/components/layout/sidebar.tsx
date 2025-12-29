@@ -15,7 +15,20 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const [isExpanded, setIsExpanded] = useState(true);
 
-  const navGroups = [
+  interface NavItem {
+    name: string;
+    href: string;
+    icon: React.ElementType;
+    hasStatus?: boolean;
+    shortcut?: string;
+  }
+
+  interface NavGroup {
+    title: string;
+    links: NavItem[];
+  }
+
+  const navGroups: NavGroup[] = [
     {
       title: "Menu Principal",
       links: [

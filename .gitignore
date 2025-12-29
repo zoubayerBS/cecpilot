@@ -43,3 +43,7 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+# PWA
+public/sw.js
+public/workbox-*
+public/worker-*.js
