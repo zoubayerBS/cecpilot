@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from 'next/navigation';
-import { HeartPulse, Gauge, List, BrainCircuit, LogOut, User, ChevronLeft, Settings, Activity } from "lucide-react"
+import { HeartPulse, Gauge, List, BrainCircuit, LogOut, User, ChevronLeft, Settings, Activity, Shield } from "lucide-react"
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ export function Sidebar() {
       title: "Configuration",
       links: [
         { name: 'Utilitaires', href: '/utilitaires', icon: Settings, shortcut: "⌘+U" },
+        { name: 'Sécurité', href: '/settings/security', icon: Shield, shortcut: "⌘+S" },
       ]
     }
   ];

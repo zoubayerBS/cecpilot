@@ -1,5 +1,5 @@
 
-import { pgTable, serial, text, timestamp, jsonb, pgSchema, unique } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, jsonb, pgSchema, unique, boolean } from 'drizzle-orm/pg-core';
 
 export const cecSchema = pgSchema('cecschema');
 
@@ -34,6 +34,8 @@ export const users = cecSchema.table('users', {
   id: serial('id').primaryKey(),
   username: text('username').unique(),
   password: text('password'), // In a real app, this should be a strong hash
+  twoFactorSecret: text('two_factor_secret'),
+  isTwoFactorEnabled: boolean('is_two_factor_enabled').default(false),
 });
 
 export const utilities = cecSchema.table('utilities', {

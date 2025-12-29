@@ -327,18 +327,26 @@ export async function getUserByUsername(username: string) {
   }
 }
 
-export async function verifyUserPassword(username: string, password: string): Promise<{ id: number; username: string } | null> {
+
+// #region 2FA
+import { authenticator } from 'otplib';
+
+export async function verifyUserPassword(username: string, password: string): Promise<{ id: number; username: string; isTwoFactorEnabled: boolean } | null> {
   try {
     const db = getDb();
     const result = await db.select({
       id: users.id,
-      username: users.username
+      username: users.username,
+      isTwoFactorEnabled: users.isTwoFactorEnabled,
     })
       .from(users)
       .where(sql`${users.username} = ${username} AND ${users.password} = crypt(${password}, ${users.password})`);
 
     if (result.length > 0) {
-      return result[0];
+      return {
+        ...result[0],
+        isTwoFactorEnabled: result[0].isTwoFactorEnabled || false
+      };
     }
     return null;
   } catch (error) {
@@ -347,7 +355,65 @@ export async function verifyUserPassword(username: string, password: string): Pr
     throw new Error(`Failed to verify user password: ${errorMessage}`);
   }
 }
+// ... existing imports ...
 
+export async function getUserStatus(username: string): Promise<{ isTwoFactorEnabled: boolean } | null> {
+  try {
+    const db = getDb();
+    const userResult = await db.select({ isTwoFactorEnabled: users.isTwoFactorEnabled }).from(users).where(eq(users.username, username));
+    if (userResult.length > 0) {
+      return { isTwoFactorEnabled: userResult[0].isTwoFactorEnabled || false };
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching user status:", error);
+    return null;
+  }
+}
+
+export async function generateTwoFactorSecret(username: string) {
+  try {
+    const secret = authenticator.generateSecret();
+    // otpauth://totp/CECPilot:username?secret=SEC&issuer=CECPilot
+    const otpauth = authenticator.keyuri(username, 'CECPilot', secret);
+    return { secret, otpauth };
+  } catch (error) {
+    throw new Error('Failed to generate 2FA secret');
+  }
+}
+
+export async function enableTwoFactor(username: string, secret: string, token: string) {
+  const isValid = authenticator.check(token, secret);
+  if (!isValid) {
+    throw new Error('Invalid token');
+  }
+
+  const db = getDb();
+  await db.update(users)
+    .set({ twoFactorSecret: secret, isTwoFactorEnabled: true })
+    .where(eq(users.username, username));
+  return true;
+}
+
+export async function verifyTwoFactor(username: string, token: string) {
+  const db = getDb();
+  const userResult = await db.select({ secret: users.twoFactorSecret }).from(users).where(eq(users.username, username));
+
+  if (userResult.length === 0 || !userResult[0].secret) {
+    throw new Error('2FA not set up for this user');
+  }
+
+  const isValid = authenticator.check(token, userResult[0].secret);
+  return isValid;
+}
+
+export async function disableTwoFactor(username: string) {
+  const db = getDb();
+  await db.update(users)
+    .set({ twoFactorSecret: null, isTwoFactorEnabled: false })
+    .where(eq(users.username, username));
+}
+// #endregion
 
 export async function repairMissingDurations(): Promise<{ updated: number, errors: number }> {
   try {
