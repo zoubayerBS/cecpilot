@@ -158,10 +158,20 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
     const [error, setError] = React.useState<string | null>(null);
     const form = useFormContext<CalculatorValues>();
 
+    // New inputs for advanced optimization
+    const [targetCI, setTargetCI] = React.useState("2.4");
+    const [temperature, setTemperature] = React.useState("36");
+
+    // Feedback / Training state
+    const [showTraining, setShowTraining] = React.useState(false);
+    const [actualFlow, setActualFlow] = React.useState("");
+    const [trainingStatus, setTrainingStatus] = React.useState<string | null>(null);
+
     const handleOptimization = async () => {
         setLoading(true);
         setError(null);
         setResult(null);
+        setTrainingStatus(null);
         const formValues = form.getValues();
         const { poids, hbInitial } = formValues;
 
@@ -174,16 +184,42 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
         try {
             const input: PerfusionInput = {
                 surfaceCorporelle: Number(bsa),
-                indexCardiaqueCible: 2.4, // Default target
-                temperature: 36
+                indexCardiaqueCible: Number(targetCI),
+                temperature: Number(temperature)
             };
             const optimization = await aiPredictionService.optimizePerfusion(input);
             setResult(optimization);
+            setShowTraining(true);
         } catch (e) {
             console.error(e);
             setError("Une erreur est survenue lors de l'optimisation.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleTrain = async () => {
+        if (!actualFlow || isNaN(Number(actualFlow)) || !bsa) return;
+
+        setTrainingStatus("Enregistrement...");
+        try {
+            const input: PerfusionInput = {
+                surfaceCorporelle: Number(bsa),
+                indexCardiaqueCible: Number(targetCI),
+                temperature: Number(temperature)
+            };
+
+            await aiPredictionService.addPerfusionTrainingData(input, Number(actualFlow));
+            const retrain = await aiPredictionService.retrainPerfusionModel();
+
+            if (retrain.success) {
+                setTrainingStatus("Apprentissage réussi ! " + retrain.message);
+                setTimeout(() => setTrainingStatus(null), 3000);
+            } else {
+                setTrainingStatus("Erreur: " + retrain.message);
+            }
+        } catch (e) {
+            setTrainingStatus("Erreur technique local.");
         }
     };
 
@@ -195,12 +231,33 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
                     Optimisation de la Perfusion (TF.js)
                 </CardTitle>
                 <CardDescription>
-                    Calcul de débit cible par tenseurs.
+                    Calcul de débit cible par tenseurs avec apprentissage continu.
                 </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Index Cardiaque Cible</label>
+                        <Input
+                            type="number"
+                            step="0.1"
+                            value={targetCI}
+                            onChange={(e) => setTargetCI(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Température (°C)</label>
+                        <Input
+                            type="number"
+                            step="0.1"
+                            value={temperature}
+                            onChange={(e) => setTemperature(e.target.value)}
+                        />
+                    </div>
+                </div>
+
                 {result && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4 border-t">
                         <Alert>
                             <ShieldAlert className="h-4 w-4" />
                             <AlertTitle>Débit Cible Calculé</AlertTitle>
@@ -213,6 +270,32 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
                         </div>
                     </div>
                 )}
+
+                {showTraining && (
+                    <div className="bg-muted/30 p-4 rounded-lg space-y-3 border border-dashed">
+                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                            <Lightbulb className="h-4 w-4 text-yellow-500" />
+                            Apprentissage / Correction
+                        </h4>
+                        <p className="text-xs text-muted-foreground">
+                            Le débit proposé ne correspond pas à votre pratique ? Entrez la valeur réelle pour que l'IA apprenne.
+                        </p>
+                        <div className="flex gap-2">
+                            <Input
+                                placeholder="Débit réel (L/min)"
+                                type="number"
+                                step="0.1"
+                                value={actualFlow}
+                                onChange={(e) => setActualFlow(e.target.value)}
+                            />
+                            <Button size="sm" variant="secondary" onClick={handleTrain} disabled={!actualFlow}>
+                                Apprendre
+                            </Button>
+                        </div>
+                        {trainingStatus && <p className="text-xs font-medium text-primary animate-pulse">{trainingStatus}</p>}
+                    </div>
+                )}
+
                 {error && (
                     <Alert variant="destructive">
                         <AlertTitle>Erreur</AlertTitle>
@@ -221,9 +304,9 @@ const PerfusionOptimization = ({ bsa, debitTheoriqueLmin }: { bsa?: string, debi
                 )}
             </CardContent>
             <CardFooter>
-                <Button onClick={handleOptimization} disabled={loading}>
+                <Button onClick={handleOptimization} disabled={loading} className="w-full">
                     {loading ? <Loader2 className="mr-2 animate-spin" /> : <Bot className="mr-2" />}
-                    Calculer
+                    Calculer & Optimiser
                 </Button>
             </CardFooter>
         </Card>

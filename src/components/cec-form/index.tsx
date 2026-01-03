@@ -55,7 +55,7 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5" />
+                <ClipboardList className="h-6 w-6" />
                 Informations Patient & Détails Cliniques
               </CardTitle>
             </CardHeader>
@@ -200,7 +200,7 @@ export function CECForm({ initialData, isReadOnly = false, onFormSave, onRiskUpd
         <AlertDialogContent className="rounded-2xl border-none shadow-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-              <RotateCcw className="h-5 w-5" />
+              <RotateCcw className="h-6 w-6" />
               Confirmation de réinitialisation
             </AlertDialogTitle>
             <AlertDialogDescription className="text-slate-600 dark:text-slate-400 py-2">

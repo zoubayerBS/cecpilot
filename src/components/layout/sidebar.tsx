@@ -45,6 +45,7 @@ export function Sidebar() {
     {
       title: "Configuration",
       links: [
+        { name: 'Mon Profil', href: '/settings/profile', icon: User },
         { name: 'Utilitaires', href: '/utilitaires', icon: Settings, shortcut: "⌘+U" },
         { name: 'Sécurité', href: '/settings/security', icon: Shield, shortcut: "⌘+S" },
       ]
@@ -54,7 +55,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "hidden md:flex flex-col z-40 transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] relative",
+        "hidden md:flex flex-col z-40 transition-all duration-500 ease-in-out relative",
         // Floating Island Base Styles
         "m-4 h-[calc(100vh-32px)] rounded-3xl border border-white/20 dark:border-white/10 shadow-2xl backdrop-blur-3xl bg-white/80 dark:bg-slate-950/80",
         isExpanded ? "w-64" : "w-20"
@@ -211,6 +212,16 @@ export function Sidebar() {
             </Button>
           </div>
         )}
+
+        {/* Copyright Notice */}
+        <div className={cn(
+          "mt-4 text-center transition-all duration-300",
+          isExpanded ? "opacity-100" : "opacity-0 h-0 overflow-hidden"
+        )}>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-tight">
+            © {new Date().getFullYear()} Zoubaier BEN SAID
+          </p>
+        </div>
       </div>
     </aside>
   );

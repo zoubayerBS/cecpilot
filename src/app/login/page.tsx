@@ -187,6 +187,7 @@ export default function LoginPage() {
                       onFocus={() => setFocusedField('code')}
                       onBlur={() => setFocusedField(null)}
                       required
+                      autoComplete='off'
                       autoFocus
                       placeholder="000 000"
                       className={cn(

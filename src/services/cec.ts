@@ -398,13 +398,30 @@ export async function enableTwoFactor(username: string, secret: string, token: s
 export async function verifyTwoFactor(username: string, token: string) {
   const db = getDb();
   const userResult = await db.select({ secret: users.twoFactorSecret }).from(users).where(eq(users.username, username));
+  if (userResult.length === 0 || !userResult[0].secret) return false;
+  return authenticator.check(token, userResult[0].secret);
+}
 
-  if (userResult.length === 0 || !userResult[0].secret) {
-    throw new Error('2FA not set up for this user');
+export async function updateUser(userId: number, data: { username?: string; password?: string }) {
+  try {
+    const db = getDb();
+    const updateData: any = {};
+    if (data.username) updateData.username = data.username;
+    if (data.password) {
+      // Use PostgreSQL crypt for hashing: crypt('password', gen_salt('bf'))
+      updateData.password = sql`crypt(${data.password}, gen_salt('bf'))`;
+    }
+
+    if (Object.keys(updateData).length === 0) return true;
+
+    await db.update(users)
+      .set(updateData)
+      .where(eq(users.id, userId));
+    return true;
+  } catch (error) {
+    console.error('Error updating user:', error);
+    throw new Error('Failed to update user profile');
   }
-
-  const isValid = authenticator.check(token, userResult[0].secret);
-  return isValid;
 }
 
 export async function disableTwoFactor(username: string) {

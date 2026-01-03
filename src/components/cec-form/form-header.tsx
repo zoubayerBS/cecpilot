@@ -27,15 +27,15 @@ export function CecFormHeader({ steps, activeStep, setActiveStep, isListening, t
                         return (
                             <div key={idx} className="flex flex-col items-center gap-2 group cursor-pointer mr-6 min-w-[60px]" onClick={() => setActiveStep(idx)}>
                                 <div className={cn(
-                                    "h-10 w-10 rounded-full flex items-center justify-center transition-all border-2",
-                                    isActive ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110" :
+                                    "h-12 w-12 rounded-full flex items-center justify-center transition-all border-2",
+                                    isActive ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20" :
                                         isCompleted ? "bg-emerald-100 border-emerald-500 text-emerald-600" :
                                             "bg-muted border-transparent text-muted-foreground"
                                 )}>
-                                    {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                                    {isCompleted ? <CheckCircle2 className="h-6 w-6" /> : <Icon className="h-6 w-6" />}
                                 </div>
                                 <span className={cn(
-                                    "text-[10px] uppercase tracking-wider font-bold hidden md:block whitespace-nowrap",
+                                    "text-xs uppercase tracking-wider font-bold hidden md:block whitespace-nowrap",
                                     isActive ? "text-primary" : isCompleted ? "text-emerald-600" : "text-muted-foreground"
                                 )}>{step.title}</span>
                             </div>

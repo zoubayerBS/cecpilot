@@ -213,7 +213,7 @@ const predictionService = {
             input.dispose();
             return {
                 targetFlowRate: targetFlow.toFixed(2),
-                recommendation: `Cible optimisée par IA locale (${targetFlow.toFixed(2)} L/min) basée sur vos protocoles.`
+                recommendation: `Cible optimisée par IA locale (${targetFlow.toFixed(2)} L/min) basée sur votre historique d'apprentissage.`
             };
         } catch (e) {
             // Fallback to heuristic
@@ -224,6 +224,50 @@ const predictionService = {
             };
         } finally {
             if (model) model.dispose();
+        }
+    },
+
+    /**
+     * Store a new training example for perfusion
+     */
+    async addPerfusionTrainingData(data: PerfusionInput, actualFlow: number) {
+        try {
+            const existing = localStorage.getItem('clinical-data-perfusion');
+            const dataset = existing ? JSON.parse(existing) : [];
+            dataset.push({
+                features: {
+                    bsa: data.surfaceCorporelle,
+                    target_ci: data.indexCardiaqueCible,
+                    temp: data.temperature
+                },
+                labels: {
+                    target_flow: actualFlow
+                },
+                timestamp: Date.now()
+            });
+            localStorage.setItem('clinical-data-perfusion', JSON.stringify(dataset));
+            return true;
+        } catch (e) {
+            console.error("Failed to save training data", e);
+            return false;
+        }
+    },
+
+    /**
+     * Retrain perfusion model from local data
+     */
+    async retrainPerfusionModel() {
+        try {
+            const existing = localStorage.getItem('clinical-data-perfusion');
+            if (!existing) return { success: false, message: "Pas de données d'entraînement." };
+            const dataset = JSON.parse(existing);
+            if (dataset.length < 5) return { success: false, message: "Pas assez de données (min 5)." };
+
+            await this.trainPerfusionModel(dataset);
+            return { success: true, message: `Modèle ré-entraîné avec ${dataset.length} cas.` };
+        } catch (e) {
+            console.error(e);
+            return { success: false, message: "Erreur lors de l'entraînement." };
         }
     },
 
@@ -596,50 +640,70 @@ const predictionService = {
     // 5. Blood Gas Analysis
     analyzeBloodGas(data: { ph: number; paco2: number; hco3: number; pao2: number; lactate?: number }) {
         let interpretation = 'Normal';
-        let severity = 'success'; // success, warning, destructive
+        let severity: 'success' | 'warning' | 'destructive' = 'success';
         const details: string[] = [];
 
+        // Clinical Thresholds & Logic
+        const isAcidosis = data.ph < 7.35;
+        const isAlkalosis = data.ph > 7.45;
+        const isRespiratory = data.paco2 > 45 || data.paco2 < 35;
+        const isMetabolic = data.hco3 > 26 || data.hco3 < 22;
+
         // 1. Acid-Base Status
-        if (data.ph < 7.35) {
+        if (isAcidosis) {
             interpretation = 'Acidose';
             severity = 'destructive';
-            if (data.paco2 > 45) {
+            if (data.paco2 > 45 && data.hco3 < 22) {
+                interpretation += ' Mixte (Respiratoire & Métabolique)';
+            } else if (data.paco2 > 45) {
                 interpretation += ' Respiratoire';
                 if (data.hco3 > 26) interpretation += ' Compensée';
+                else interpretation += ' Aigüe';
             } else if (data.hco3 < 22) {
                 interpretation += ' Métabolique';
                 if (data.paco2 < 35) interpretation += ' Compensée';
-            } else {
-                interpretation += ' Mixte (probable)';
+                else interpretation += ' Pure';
             }
-        } else if (data.ph > 7.45) {
+        } else if (isAlkalosis) {
             interpretation = 'Alcalose';
             severity = 'warning';
-            if (data.paco2 < 35) {
+            if (data.paco2 < 35 && data.hco3 > 26) {
+                interpretation += ' Mixte';
+            } else if (data.paco2 < 35) {
                 interpretation += ' Respiratoire';
+                if (data.hco3 < 22) interpretation += ' Compensée';
             } else if (data.hco3 > 26) {
                 interpretation += ' Métabolique';
+                if (data.paco2 > 45) interpretation += ' Compensée';
             }
         }
 
-        // 2. Oxygenation
+        // 2. Oxygenation (PaO2)
         if (data.pao2 < 60) {
             details.push('Hypoxémie sévère');
-            if (severity !== 'destructive') severity = 'destructive';
+            severity = 'destructive';
         } else if (data.pao2 < 80) {
             details.push('Hypoxémie modérée');
+            if (severity === 'success') severity = 'warning';
+        } else if (data.pao2 > 250) {
+            details.push('Hyperoxie notable');
+            if (severity === 'success') severity = 'warning';
         }
 
         // 3. Lactate
         if (data.lactate && data.lactate > 2) {
             details.push(`Hyperlactatémie (${data.lactate} mmol/L)`);
-            if (data.lactate > 4 && severity !== 'destructive') severity = 'destructive';
+            if (data.lactate > 4) severity = 'destructive';
             else if (severity !== 'destructive') severity = 'warning';
         }
 
+        // 4. PaCO2 Specifics for Perfusionists
+        if (data.paco2 > 50) details.push('Hypercapnie (risque d\'acidose respi)');
+        if (data.paco2 < 30) details.push('Hypocapnie (risque de vasoconstriction cérébrale)');
+
         return {
             interpretation,
-            details: details.join(', '),
+            details: details.length > 0 ? details.join(' • ') : "Paramètres dans les limites acceptables.",
             severity
         };
     },
@@ -648,7 +712,7 @@ const predictionService = {
     async analyzeBalance(data: { totalEntrees: number; totalSorties: number; dureeCecMin?: number }) {
         const balance = data.totalEntrees - data.totalSorties;
         let suggestion = "Bilan équilibré.";
-        let status = 'neutral';
+        let status: 'neutral' | 'positive' | 'overload' | 'negative' | 'alert' = 'neutral';
         let aiModelUsed = false;
 
         try {
@@ -666,30 +730,33 @@ const predictionService = {
             model.dispose();
         } catch (e) {
             // Heuristic fallback if no model trained
-            if (balance > 1000) {
-                suggestion = "Surcharge volémique importante (> 1L). Envisager hémofiltration.";
+            if (balance > 1500) {
+                suggestion = "Surcharge volémique majeure (> 1.5L). Risque d'oedème tissulaire. Envisager hémofiltration agressive.";
                 status = 'overload';
-            } else if (balance > 500) {
-                suggestion = "Bilan positif modéré. À surveiller.";
+            } else if (balance > 800) {
+                suggestion = "Bilan positif important. Surveiller la fonction pulmonaire et envisager une hémofiltration.";
+                status = 'overload';
+            } else if (balance > 400) {
+                suggestion = "Bilan positif modéré. À surveiller selon la phase de la CEC.";
                 status = 'positive';
-            } else if (balance > 150) {
-                suggestion = "Bilan légèrement positif.";
+            } else if (balance > 100) {
+                suggestion = "Bilan légèrement positif. Physiologique en début de CEC.";
                 status = 'neutral';
-            } else if (balance < -1000) {
-                suggestion = "Déficit volémique important. Risque de désamorçage ou bas débit.";
+            } else if (balance < -1200) {
+                suggestion = "Déficit volémique critique. Risque immédiat de désamorçage. Remplissage urgent requis.";
                 status = 'alert';
-            } else if (balance < -500) {
-                suggestion = "Bilan négatif significatif. Vérifier le remplissage.";
+            } else if (balance < -700) {
+                suggestion = "Bilan négatif significatif. Vérifier le volume du réservoir veineux.";
                 status = 'negative';
-            } else if (balance < -150) {
-                suggestion = "Bilan légèrement négatif.";
+            } else if (balance < -200) {
+                suggestion = "Bilan légèrement négatif. Surveiller les tendances.";
                 status = 'neutral';
             }
         }
 
-        if (data.dureeCecMin && data.dureeCecMin > 120 && balance > 1500 && !aiModelUsed) {
-            suggestion += " (Attention: CEC longue + surcharge)";
-            status = 'alert';
+        if (data.dureeCecMin && data.dureeCecMin > 120 && balance > 1000 && !aiModelUsed) {
+            suggestion = "Attention: CEC prolongée avec balance > 1L. Risque d'inflammation systémique et de perméabilité capillaire accrue.";
+            status = 'overload';
         }
 
         return {

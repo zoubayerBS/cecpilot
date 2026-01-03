@@ -14,6 +14,14 @@ interface UseVoiceInputProps {
     onTranscript?: (transcript: string) => void;
 }
 
+// Global type augmentation
+declare global {
+    interface Window {
+        SpeechRecognition: any;
+        webkitSpeechRecognition: any;
+    }
+}
+
 // Simple Levenshtein distance for fuzzy matching
 const levenshteinDistance = (a: string, b: string): number => {
     if (a.length === 0) return b.length;

@@ -42,4 +42,6 @@ const nextConfig: NextConfig = {
   transpilePackages: [],
 };
 
-export default withPWA(nextConfig);
+// Only wrap with PWA in production to avoid Turbopack warnings in development
+const isDev = process.env.NODE_ENV === "development";
+export default isDev ? nextConfig : withPWA(nextConfig);
