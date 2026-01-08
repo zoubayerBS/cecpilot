@@ -3,7 +3,7 @@
 import { getDb } from '@/lib/postgres';
 import { cecForms, sessions, users } from '@/lib/db/schema';
 import type { CecFormValues } from '@/components/cec-form/schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { parse, differenceInMinutes, isValid } from 'date-fns';
 
@@ -332,15 +332,30 @@ export async function getUserByUsername(username: string) {
 import { authenticator } from 'otplib';
 
 export async function verifyUserPassword(username: string, password: string): Promise<{ id: number; username: string; isTwoFactorEnabled: boolean } | null> {
+  console.log(`[AUTH] Verifying password for username: "${username}"`);
   try {
     const db = getDb();
+    console.log('[AUTH] DB instance obtained');
+
+    if (!users) {
+      console.error('[AUTH] Users table object is UNDEFINED!');
+      throw new Error('Internal error: Users table schema not loaded.');
+    }
+
     const result = await db.select({
       id: users.id,
       username: users.username,
       isTwoFactorEnabled: users.isTwoFactorEnabled,
     })
       .from(users)
-      .where(sql`${users.username} = ${username} AND ${users.password} = crypt(${password}, ${users.password})`);
+      .where(
+        and(
+          eq(users.username, username),
+          sql`${users.password} = crypt(${password}, ${users.password})`
+        )
+      );
+
+    console.log(`[AUTH] Query completed. Results count: ${result.length}`);
 
     if (result.length > 0) {
       return {
@@ -350,7 +365,7 @@ export async function verifyUserPassword(username: string, password: string): Pr
     }
     return null;
   } catch (error) {
-    console.error('Error verifying user password:', error);
+    console.error('[AUTH] Error verifying user password:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to verify user password: ${errorMessage}`);
   }
