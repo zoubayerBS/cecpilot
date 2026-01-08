@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, parse, isValid, differenceInMinutes } from "date-fns";
 import { cecFormSchema, type CecFormValues, primingSolutes, type PrimingRow, type CardioplegiaDose, type TimelineEvent } from "./schema";
@@ -101,7 +101,7 @@ export function useCecFormLogic({ initialData, isReadOnly = false, onFormSave, o
         mode: "onBlur",
     });
 
-    const { watch, setValue, reset, getValues, formState: { isDirty } } = form;
+    const { watch, setValue, reset, getValues, control, formState: { isDirty } } = form;
 
     // --- Voice Control ---
     const handleVoiceCommand = (msg: string, variant: "default" | "destructive" | "success" = "default") => {
@@ -204,10 +204,15 @@ export function useCecFormLogic({ initialData, isReadOnly = false, onFormSave, o
     const taille = watch("taille");
     const age = watch("age");
     const dateNaissance = watch("date_naissance");
-    const hte = watch("hte");
-    const primingValues = watch("priming");
-    const cardioplegiaDoses = watch("cardioplegiaDoses");
-    const timelineEvents = watch("timelineEvents") || [];
+    const hte = useWatch({ control, name: "hte" });
+    const primingValues = useWatch({ control, name: "priming" });
+    const cardioplegiaDoses = useWatch({ control, name: "cardioplegiaDoses" });
+    const timelineEvents = useWatch({ control, name: "timelineEvents" }) || [];
+    const bloodGases = useWatch({ control, name: "bloodGases" });
+    const apportsAnesth = useWatch({ control, name: "entrees_apports_anesthesiques" });
+    const hemofiltration = useWatch({ control, name: "sorties_hemofiltration" });
+    const aspirPerdue = useWatch({ control, name: "sorties_aspiration_perdue" });
+    const sangPompe = useWatch({ control, name: "sorties_sang_pompe_residuel" });
 
     // 1. AI Transfusion Prediction
     React.useEffect(() => {
@@ -245,7 +250,7 @@ export function useCecFormLogic({ initialData, isReadOnly = false, onFormSave, o
 
     // 3. Draft Auto-Saving
     React.useEffect(() => {
-        if (isReadOnly || initialData?.id) return;
+        if (isReadOnly || initialData?.id || isSubmitting) return;
         const draftKey = `cec_draft_${user?.username || 'guest'}`;
         const timer = setTimeout(() => {
             const data = getValues();
@@ -253,7 +258,7 @@ export function useCecFormLogic({ initialData, isReadOnly = false, onFormSave, o
             window.dispatchEvent(new CustomEvent('cec-draft-updated', { detail: data }));
         }, 2000);
         return () => clearTimeout(timer);
-    }, [watch(), user?.username, isReadOnly, initialData, getValues]);
+    }, [watch(), user?.username, isReadOnly, initialData, getValues, isSubmitting]);
 
     // 4. Draft Loading
     React.useEffect(() => {
@@ -297,22 +302,46 @@ export function useCecFormLogic({ initialData, isReadOnly = false, onFormSave, o
         }
     }, [dateNaissance, setValue]);
 
-    // 6. Totals Calculations (Priming, Cardio)
-    React.useEffect(() => {
+    // 6. Totals Calculations (Priming, Cardio, Balance)
+    const primingTotal = React.useMemo(() => {
         const primingArray = Array.isArray(primingValues) ? primingValues : [];
-        const total = primingArray.reduce((acc, row) => {
+        return primingArray.reduce((acc, row) => {
             const initialValue = Number(row?.initial) || 0;
             const ajoutValue = Number(row?.ajout) || 0;
             return acc + initialValue + ajoutValue;
         }, 0);
-        setValue('entrees_priming', total > 0 ? total : undefined, { shouldDirty: true, shouldValidate: true });
-    }, [primingValues, setValue]);
+    }, [primingValues]);
+
+    const cardioTotal = React.useMemo(() => {
+        const dosesArray = Array.isArray(cardioplegiaDoses) ? cardioplegiaDoses : [];
+        return dosesArray.reduce((acc, dose) => acc + (Number(dose?.dose) || 0), 0);
+    }, [cardioplegiaDoses]);
+
+    const diureseTotal = React.useMemo(() => {
+        const bgArray = Array.isArray(bloodGases) ? bloodGases : [];
+        return bgArray.reduce((acc, col) => acc + (Number(col?.diurese) || 0), 0);
+    }, [bloodGases]);
 
     React.useEffect(() => {
-        const dosesArray = Array.isArray(cardioplegiaDoses) ? cardioplegiaDoses : [];
-        const total = dosesArray.reduce((acc, dose) => acc + (Number(dose?.dose) || 0), 0);
-        setValue('entrees_cardioplegie', total > 0 ? total : undefined, { shouldDirty: true, shouldValidate: true });
-    }, [cardioplegiaDoses, setValue]);
+        setValue('entrees_priming', primingTotal > 0 ? primingTotal : undefined, { shouldDirty: true, shouldValidate: true });
+    }, [primingTotal, setValue]);
+
+    React.useEffect(() => {
+        setValue('entrees_cardioplegie', cardioTotal > 0 ? cardioTotal : undefined, { shouldDirty: true, shouldValidate: true });
+    }, [cardioTotal, setValue]);
+
+    React.useEffect(() => {
+        setValue('sorties_diurese', diureseTotal > 0 ? diureseTotal : undefined, { shouldDirty: true, shouldValidate: true });
+    }, [diureseTotal, setValue]);
+
+    // 6b. Grand Totals for Balance
+    const totalEntreesValue = (Number(apportsAnesth) || 0) + (primingTotal || 0) + (cardioTotal || 0);
+    const totalSortiesValue = (diureseTotal || 0) + (Number(hemofiltration) || 0) + (Number(aspirPerdue) || 0) + (Number(sangPompe) || 0);
+
+    React.useEffect(() => {
+        setValue('total_entrees', totalEntreesValue > 0 ? totalEntreesValue : undefined, { shouldValidate: true });
+        setValue('total_sorties', totalSortiesValue > 0 ? totalSortiesValue : undefined, { shouldValidate: true });
+    }, [totalEntreesValue, totalSortiesValue, setValue]);
 
     // 7. Timeline Durations
     React.useEffect(() => {

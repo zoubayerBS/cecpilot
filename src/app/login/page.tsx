@@ -251,6 +251,7 @@ export default function LoginPage() {
                       onBlur={() => setFocusedField(null)}
                       required
                       placeholder="Entrez votre identifiant"
+                      autoComplete="username"
                       className={cn(
                         "pl-10 h-11 transition-all duration-200",
                         focusedField === 'username' && "ring-2 ring-primary/20 border-primary"
@@ -278,6 +279,7 @@ export default function LoginPage() {
                       onBlur={() => setFocusedField(null)}
                       required
                       placeholder="••••••••"
+                      autoComplete="current-password"
                       className={cn(
                         "pl-10 h-11 transition-all duration-200",
                         focusedField === 'password' && "ring-2 ring-primary/20 border-primary"

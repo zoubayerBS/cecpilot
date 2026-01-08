@@ -8,7 +8,14 @@ let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 function getConnectionString(): string {
   const url = process.env.DATABASE_URL;
   if (!url || url.trim() === '') {
+    console.error('❌ DATABASE_URL status: UNDEFINED');
     throw new Error('DATABASE_URL is missing. Set it in your hosting environment variables (e.g., Netlify Site settings -> Environment). Do not rely on .env.local in production.');
+  }
+  console.log('✅ DATABASE_URL status: DEFINED');
+  if (url.includes('sslmode=require')) {
+    console.log('🔒 SSL Mode: require (detected in URL)');
+  } else {
+    console.warn('⚠️ SSL Mode: might be missing in URL (consider adding ?sslmode=require)');
   }
   return url;
 }

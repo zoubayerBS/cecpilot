@@ -111,11 +111,10 @@ export function ContextualTools({ activeStep, watch }: ContextualToolsProps) {
     );
 
     // Switch content based on step
-    // 0 = Patient, 3 = Perfusion (index 3 in tabs? Let's check tab array index)
-    // Patient=0, BilanPre=1, Materiel=2, Perfusion=3, BilanFinal=4
+    // Checklist=0, Patient=1, BilanPre=2, Materiel=3, Perfusion=4, BilanFinal=5
     switch (activeStep) {
-        case 0: return renderPatientTools();
-        case 3: return renderPerfusionTools();
+        case 1: return renderPatientTools();
+        case 4: return renderPerfusionTools();
         default: return renderDefaults();
     }
 }

@@ -20,52 +20,8 @@ import { Brain } from "lucide-react";
 export function BalanceIO() {
     const { control, setValue } = useFormContext<CecFormValues>();
 
-    const entrees = useWatch({
-        control,
-        name: [
-            'entrees_apports_anesthesiques',
-            'entrees_priming',
-            'entrees_cardioplegie'
-        ]
-    });
-
-    const sorties = useWatch({
-        control,
-        name: [
-            'sorties_diurese',
-            'sorties_hemofiltration',
-            'sorties_aspiration_perdue',
-            'sorties_sang_pompe_residuel'
-        ]
-    });
-
-    // Also watch duration to provide context (optional)
-    const dureeCec = useWatch({ control, name: 'duree_cec' });
-
-    const bloodGases = useWatch({ control, name: 'bloodGases' });
-
-    const totalEntrees = React.useMemo(() => {
-        return (entrees[0] || 0) + (entrees[1] || 0) + (entrees[2] || 0);
-    }, [entrees]);
-
-    const totalDiurese = React.useMemo(() => {
-        const bgArray = Array.isArray(bloodGases) ? bloodGases : [];
-        return bgArray.reduce((acc, col) => acc + (Number(col?.diurese) || 0), 0);
-    }, [bloodGases]);
-
-    const totalSorties = React.useMemo(() => {
-        return (totalDiurese || 0) + (sorties[1] || 0) + (sorties[2] || 0) + (sorties[3] || 0);
-    }, [totalDiurese, sorties]);
-
-
-    React.useEffect(() => {
-        setValue('total_entrees', totalEntrees > 0 ? totalEntrees : undefined, { shouldValidate: true });
-    }, [totalEntrees, setValue]);
-
-    React.useEffect(() => {
-        setValue('sorties_diurese', totalDiurese > 0 ? totalDiurese : undefined, { shouldValidate: true, shouldDirty: true });
-        setValue('total_sorties', totalSorties > 0 ? totalSorties : undefined, { shouldValidate: true });
-    }, [totalDiurese, totalSorties, setValue]);
+    const totalEntrees = useWatch({ control, name: 'total_entrees' }) || 0;
+    const totalSorties = useWatch({ control, name: 'total_sorties' }) || 0;
 
     const grandTotal = totalEntrees + totalSorties;
     const entreesPercentage = grandTotal > 0 ? (totalEntrees / grandTotal) * 100 : 0;
@@ -281,8 +237,8 @@ export function BalanceIO() {
                 </div>
 
                 <div className={`mt-2 flex flex-col items-center justify-center p-6 rounded-2xl shadow-inner border-2 border-dashed transition-all ${totalEntrees - totalSorties > 1000 ? 'bg-red-50 border-red-200 text-red-900' :
-                        totalEntrees - totalSorties < -500 ? 'bg-amber-50 border-amber-200 text-amber-900' :
-                            'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                    totalEntrees - totalSorties < -500 ? 'bg-amber-50 border-amber-200 text-amber-900' :
+                        'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
                     }`}>
                     <span className="text-xs font-bold uppercase tracking-widest opacity-60 mb-1">Balance Volémique Nette</span>
                     <div className="text-4xl font-black flex items-center gap-2">
@@ -294,15 +250,15 @@ export function BalanceIO() {
                 {/* AI Balance Analysis */}
                 {balanceAnalysis && (
                     <Alert className={`border-l-4 shadow-md ${balanceAnalysis.status === 'overload' || balanceAnalysis.status === 'alert'
-                            ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20'
-                            : balanceAnalysis.status === 'positive' || balanceAnalysis.status === 'negative'
-                                ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
-                                : 'border-green-500 bg-green-50/50 dark:bg-green-950/20'
+                        ? 'border-red-500 bg-red-50/50 dark:bg-red-950/20'
+                        : balanceAnalysis.status === 'positive' || balanceAnalysis.status === 'negative'
+                            ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20'
+                            : 'border-green-500 bg-green-50/50 dark:bg-green-950/20'
                         }`}>
                         <div className="flex items-start gap-4 p-1">
                             <div className={`p-2 rounded-full ${balanceAnalysis.status === 'overload' || balanceAnalysis.status === 'alert' ? 'bg-red-100 text-red-600' :
-                                    balanceAnalysis.status === 'neutral' ? 'bg-green-100 text-green-600' :
-                                        'bg-amber-100 text-amber-600'
+                                balanceAnalysis.status === 'neutral' ? 'bg-green-100 text-green-600' :
+                                    'bg-amber-100 text-amber-600'
                                 }`}>
                                 <Brain className="h-5 w-5" />
                             </div>
